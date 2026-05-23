@@ -73,6 +73,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       const data = await loginUser({ email, password, rememberMe });
+      if (data.token) localStorage.setItem("authToken", data.token);
       setUser(data.user);
       return data.user;
     } catch (err) {
@@ -89,6 +90,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       const data = await signupUser({ name, email, password, confirmPassword, dob });
+      if (data.token) localStorage.setItem("authToken", data.token);
       setUser(data.user);
       return data.user;
     } catch (err) {
@@ -105,6 +107,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       const data = await googleLoginUser(credential);
+      if (data.token) localStorage.setItem("authToken", data.token);
       setUser(data.user);
       return data.user;
     } catch (err) {
@@ -123,6 +126,7 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error("Logout error:", err.message);
     } finally {
+      localStorage.removeItem("authToken");
       setUser(null);
       setLoading(false);
     }

@@ -220,10 +220,12 @@
   counter-increment: smItem;
   content: counter(smItem, decimal-leading-zero);
   position: absolute;
-  top: 0.1em;
-  right: 2.8em;
-  font-size: 18px;
+  top: -0.09em;
+  left: 77%;
+  margin-left: 0;
+  font-size: 60px;
   font-weight: 400;
+  font-family: 'Abuget', cursive;
   color: var(--sm-accent, #e52e71);
   letter-spacing: 0;
   pointer-events: none;

@@ -143,7 +143,7 @@ const Home = () => {
       <HeroSlider items={trending.length > 0 ? trending : topRated} type="movie" />
 
       {/* Content Rows */}
-      <div className="relative z-20 -mt-16 md:-mt-24 space-y-2">
+      <div className="space-y-2 mt-4">
         
         {/* 1. Trending Movies */}
         <MediaSlider title="Trending Movies" items={trending} type="movie" viewMoreLink="/movies/trending" />

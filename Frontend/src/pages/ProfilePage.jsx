@@ -88,6 +88,13 @@ const ProfilePage = () => {
     }
   }, [user]);
 
+  // Guard: redirect minors away from content preferences tab
+  useEffect(() => {
+    if (activeTab === "preferences" && !(user?.showContentPreferences || user?.isAdult)) {
+      setActiveTab("profile");
+    }
+  }, [activeTab, user]);
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setSuccessMsg("");
@@ -308,16 +315,19 @@ const ProfilePage = () => {
           >
             Account Settings
           </button>
-          <button
-            onClick={() => setActiveTab("preferences")}
-            className={`py-3 px-5 border-b-2 font-semibold text-sm transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === "preferences"
-                ? "border-yellow-400 text-white"
-                : "border-transparent text-zinc-500 hover:text-white"
-            }`}
-          >
-            Content Preferences
-          </button>
+          {/* Content Preferences — only visible for adult (18+) users */}
+          {(user?.showContentPreferences || user?.isAdult) && (
+            <button
+              onClick={() => setActiveTab("preferences")}
+              className={`py-3 px-5 border-b-2 font-semibold text-sm transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === "preferences"
+                  ? "border-yellow-400 text-white"
+                  : "border-transparent text-zinc-500 hover:text-white"
+              }`}
+            >
+              Content Preferences
+            </button>
+          )}
           <button
             onClick={() => setActiveTab("watchlist")}
             className={`py-3 px-5 border-b-2 font-semibold text-sm transition-all whitespace-nowrap cursor-pointer ${
@@ -447,7 +457,7 @@ const ProfilePage = () => {
             </div>
           )}
 
-          {activeTab === "preferences" && (
+          {activeTab === "preferences" && (user?.showContentPreferences || user?.isAdult) && (
             <div className="max-w-2xl bg-zinc-950/40 p-6 sm:p-8 rounded-2xl border border-white/5 backdrop-blur-md space-y-6 animate-fade-in font-[Inter]">
               <div>
                 <h2 className="text-xl font-bold mb-1">Content Preferences</h2>

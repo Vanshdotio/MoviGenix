@@ -241,7 +241,7 @@ const LoginPage = () => {
 
         {/* Google Authentication Component */}
         <div className="flex justify-center w-full">
-          <div className="w-full [&>div]:!w-full [&_iframe]:!w-full [&_iframe]:!rounded-xl overflow-hidden">
+          <div className="flex justify-center w-full [&>div]:!flex [&>div]:!justify-center">
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
               onError={() => setErrorMsg("Google Sign-In failed. Please try again.")}
@@ -249,7 +249,7 @@ const LoginPage = () => {
               theme="dark"
               shape="rectangular"
               size="large"
-              width="100%"
+              width="360"
             />
           </div>
         </div>

@@ -4,7 +4,7 @@ import { searchMedia } from "../services/api";
 
 const SearchOverlay = () => {
   const [text, setText] = useState("");
-  const [searchType, setSearchType] = useState("movie"); // 'movie', 'tv', 'anime', 'person'
+  const [searchType, setSearchType] = useState("movie"); // 'movie', 'tv', 'anime', 'cartoon'
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -45,8 +45,8 @@ const SearchOverlay = () => {
         return "Search TV Shows...";
       case "anime":
         return "Search Anime...";
-      case "person":
-        return "Search Actors...";
+      case "cartoon":
+        return "Search Cartoons...";
       default:
         return "Search...";
     }
@@ -60,8 +60,8 @@ const SearchOverlay = () => {
         return "TV Shows";
       case "anime":
         return "Anime";
-      case "person":
-        return "Actors";
+      case "cartoon":
+        return "Cartoons";
       default:
         return "Content";
     }
@@ -137,7 +137,7 @@ const SearchOverlay = () => {
           { key: "movie", label: "Movies" },
           { key: "tv", label: "TV Shows" },
           { key: "anime", label: "Anime" },
-          { key: "person", label: "Actors" },
+          { key: "cartoon", label: "Cartoons" },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -172,43 +172,6 @@ const SearchOverlay = () => {
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
               {results.map((item) => {
-                if (searchType === "person") {
-                  const title = item.name || "Unknown";
-                  const profileUrl = item.profile_path
-                    ? `https://image.tmdb.org/t/p/w500${item.profile_path}`
-                    : "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=500&q=80";
-                  const knownFor = item.known_for
-                    ? item.known_for.map((m) => m.title || m.name).filter(Boolean).slice(0, 2).join(", ")
-                    : "";
-
-                  return (
-                    <Link
-                      key={item.id}
-                      to={`/person/${item.id}`}
-                      className="group block bg-[#111] rounded-xl overflow-hidden shadow-md hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 cursor-pointer"
-                    >
-                      <div className="relative aspect-[2/3] overflow-hidden bg-gray-950">
-                        <img
-                          src={profileUrl}
-                          alt={title}
-                          loading="lazy"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
-                        />
-
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 p-3.5 flex flex-col justify-end">
-                          <p className="text-sm font-semibold text-white leading-tight line-clamp-2">
-                            {title}
-                          </p>
-                          {knownFor ? (
-                            <p className="text-[11px] text-gray-400 mt-1 line-clamp-2 leading-snug">
-                              Known for: {knownFor}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                }
 
                 const title = item.title || item.name || "Untitled";
                 const date = item.release_date || item.first_air_date || "";

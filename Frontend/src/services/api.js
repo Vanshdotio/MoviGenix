@@ -18,6 +18,18 @@ export const authClient = axios.create({
   withCredentials: true,
 });
 
+// Attach Bearer token from localStorage to every request (fallback for cross-domain where cookies fail)
+const attachToken = (config) => {
+  const token = localStorage.getItem("authToken");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+};
+
+apiClient.interceptors.request.use(attachToken);
+authClient.interceptors.request.use(attachToken);
+
 /**
  * ==========================================
  * MOVIE METHODS

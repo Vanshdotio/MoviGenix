@@ -133,6 +133,9 @@ const filterUserMediaLists = async (user) => {
   
   if (userObj.password) delete userObj.password;
 
+  // Computed field: only adults can access content preferences
+  userObj.showContentPreferences = !!userObj.isAdult;
+
   if (!shouldFilter) return userObj;
 
   const mediaItems = [];
@@ -241,10 +244,11 @@ const generateToken = (userId) => {
 };
 
 const setCookieToken = (res, token) => {
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookie("token", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   });
 };
@@ -337,14 +341,34 @@ const login = async (req, res) => {
       return res.status(400).json({ error: "Invalid email or password." });
     }
 
+    // Recalculate age on every login (user may have turned 18 since last session)
+    if (user.dob) {
+      const currentAge = calculateAge(user.dob);
+      const wasAdult = user.isAdult;
+      user.age = currentAge;
+      user.isAdult = currentAge >= 18;
+
+      // If user just turned 18, keep existing preferences
+      // If user is still minor, enforce restrictions
+      if (!user.isAdult) {
+        user.safeMode = true;
+        user.hideMature = true;
+      }
+
+      if (user.age !== currentAge || user.isAdult !== wasAdult) {
+        await user.save();
+      }
+    }
+
     const token = generateToken(user._id);
     
     // Adjust cookie age if Remember Me is checked
+    const isProduction = process.env.NODE_ENV === "production";
     const cookieMaxAge = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // 30 days vs 1 day
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
       maxAge: cookieMaxAge,
     });
 
@@ -404,6 +428,19 @@ const googleLogin = async (req, res) => {
       }
     }
 
+    // Recalculate age on every Google login
+    if (user.dob) {
+      const currentAge = calculateAge(user.dob);
+      user.age = currentAge;
+      user.isAdult = currentAge >= 18;
+
+      if (!user.isAdult) {
+        user.safeMode = true;
+        user.hideMature = true;
+      }
+      await user.save();
+    }
+
     const token = generateToken(user._id);
     setCookieToken(res, token);
 
@@ -424,10 +461,11 @@ const googleLogin = async (req, res) => {
 // @route   POST /api/auth/logout
 // @access  Public
 const logout = (req, res) => {
+  const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
   });
   return res.json({ message: "Logged out successfully." });
 };
@@ -486,11 +524,22 @@ const updateProfile = async (req, res) => {
       }
     }
 
-    if (typeof safeMode === "boolean") {
-      user.safeMode = user.isAdult ? safeMode : true;
-    }
-    if (typeof hideMature === "boolean") {
-      user.hideMature = user.isAdult ? hideMature : true;
+    if (typeof safeMode === "boolean" || typeof hideMature === "boolean") {
+      // Minors cannot change content restriction settings
+      if (!user.isAdult) {
+        if ((typeof safeMode === "boolean" && safeMode === false) ||
+            (typeof hideMature === "boolean" && hideMature === false)) {
+          return res.status(403).json({
+            error: "Content preferences are restricted for users under 18."
+          });
+        }
+      }
+      if (typeof safeMode === "boolean") {
+        user.safeMode = user.isAdult ? safeMode : true;
+      }
+      if (typeof hideMature === "boolean") {
+        user.hideMature = user.isAdult ? hideMature : true;
+      }
     }
 
     await user.save();

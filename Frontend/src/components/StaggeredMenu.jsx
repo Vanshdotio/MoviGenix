@@ -300,48 +300,51 @@ export const StaggeredMenu = ({
                   </li>
                 ))}
               </ul>
-              {displaySocials && socialItems && socialItems.length > 0 && (
-                <div className="sm-socials" aria-label="Social links">
-                  <h3 className="sm-socials-title">Socials</h3>
-                  <ul className="sm-socials-list" role="list">
-                    {socialItems.map((s, i) => (
-                      <li key={s.label + i} className="sm-socials-item">
-                        <a href={s.link} target="_blank" rel="noopener noreferrer" className="sm-socials-link">
-                          {s.label}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {/* Bottom section: Socials + Account pushed to bottom together */}
+              <div className="mt-auto flex flex-col gap-4">
+                {displaySocials && socialItems && socialItems.length > 0 && (
+                  <div className="sm-socials" aria-label="Social links" style={{ marginTop: 0 }}>
+                    <h3 className="sm-socials-title">Socials</h3>
+                    <ul className="sm-socials-list" role="list">
+                      {socialItems.map((s, i) => (
+                        <li key={s.label + i} className="sm-socials-item">
+                          <a href={s.link} target="_blank" rel="noopener noreferrer" className="sm-socials-link">
+                            {s.label}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
-              {/* Account / Extra Section */}
-              {items.find(it => it.isAccount) && (
-                <div className="mt-auto pt-4 border-t border-white/10 sm-account-section">
-                   {items.filter(it => it.isAccount).map((it, idx) => (
-                     <div key={idx} className="flex items-center justify-between gap-4 py-2 px-1">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={it.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(it.name)}`}
-                            alt={it.name}
-                            className="w-10 h-10 rounded-full object-cover border border-[#e52e71]/30"
-                          />
-                          <div className="flex flex-col text-left">
-                            <span className="text-white font-bold text-sm leading-none mb-1 truncate max-w-[150px]">{it.name}</span>
-                            <span className="text-zinc-500 text-xs truncate max-w-[150px]">{it.email}</span>
+                {/* Account / Extra Section */}
+                {items.find(it => it.isAccount) && (
+                  <div className="pt-4 border-t border-white/10 sm-account-section">
+                     {items.filter(it => it.isAccount).map((it, idx) => (
+                       <div key={idx} className="flex items-center justify-between gap-4 py-2 px-1">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={it.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(it.name)}`}
+                              alt={it.name}
+                              className="w-10 h-10 rounded-full object-cover border border-[#e52e71]/30"
+                            />
+                            <div className="flex flex-col text-left">
+                              <span className="text-white font-bold text-sm leading-none mb-1 truncate max-w-[150px]">{it.name}</span>
+                              <span className="text-zinc-500 text-xs truncate max-w-[150px]">{it.email}</span>
+                            </div>
                           </div>
-                        </div>
-                        <button 
-                          onClick={() => { it.onLogout(); closeMenu(); }}
-                          className="w-9 h-9 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-colors border border-red-500/20 cursor-pointer"
-                          title="Log Out"
-                        >
-                          🚪
-                        </button>
-                     </div>
-                   ))}
-                </div>
-              )}
+                          <button 
+                            onClick={() => { it.onLogout(); closeMenu(); }}
+                            className="w-9 h-9 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-colors border border-red-500/20 cursor-pointer"
+                            title="Log Out"
+                          >
+                            🚪
+                          </button>
+                       </div>
+                     ))}
+                  </div>
+                )}
+              </div>
             </div>
           </aside>
         </div>,

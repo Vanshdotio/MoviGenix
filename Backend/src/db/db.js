@@ -91,33 +91,21 @@ const migrateDatabase = async () => {
     const users = await usersCollection.find({}).toArray();
     let migratedCount = 0;
 
-    console.log(`[Migration] Found ${users.length} user(s) to check.`);
-
     for (const user of users) {
       let changed = false;
-      const userName = user.name || user.email || user._id;
 
       // Read raw data from MongoDB (bypass Mongoose defaults)
       let currentWatchlist = user.watchlist || {};
       let currentContinue = user.continueWatching || {};
 
-      // Log what we find
-      const cartoonWLCount = Array.isArray(currentWatchlist.cartoon) ? currentWatchlist.cartoon.length : 0;
-      const cartoonCWCount = Array.isArray(currentContinue.cartoon) ? currentContinue.cartoon.length : 0;
-      const movieWLCount = Array.isArray(currentWatchlist.movie) ? currentWatchlist.movie.length : 0;
-      const movieCWCount = Array.isArray(currentContinue.movie) ? currentContinue.movie.length : 0;
-      console.log(`[Migration] User "${userName}": watchlist.cartoon=${cartoonWLCount}, watchlist.movie=${movieWLCount}, continueWatching.cartoon=${cartoonCWCount}, continueWatching.movie=${movieCWCount}`);
-
       // 1. Handle legacy flat-array format
       if (Array.isArray(user.watchlist)) {
-        console.log(`[Migration] User "${userName}": Legacy flat watchlist array detected.`);
         const cartoon = user.watchlist.filter(item => item.type === "movie" || item.type === "cartoon").map(item => ({ ...item, type: "cartoon" }));
         const tv = user.watchlist.filter(item => item.type === "tv");
         const anime = user.watchlist.filter(item => item.type === "anime");
         currentWatchlist = { movie: [], cartoon, tv, anime };
         changed = true;
       } else if (user.watchlist && user.watchlist.movies) {
-        console.log(`[Migration] User "${userName}": Legacy .movies key detected in watchlist.`);
         currentWatchlist = {
           movie: user.watchlist.movies.map(item => ({ ...item, type: "movie" })),
           cartoon: user.watchlist.cartoon || [],
@@ -128,7 +116,6 @@ const migrateDatabase = async () => {
       }
 
       if (Array.isArray(user.continueWatching)) {
-        console.log(`[Migration] User "${userName}": Legacy flat continueWatching array detected.`);
         const cartoon = user.continueWatching.filter(item => item.type === "movie" || item.type === "cartoon").map(item => ({
           id: item.id, cartoonId: item.movieId || item.id,
           progress: item.progress || 0, duration: item.duration || 0,
@@ -148,7 +135,6 @@ const migrateDatabase = async () => {
         currentContinue = { movie: [], cartoon, tv, anime };
         changed = true;
       } else if (user.continueWatching && user.continueWatching.movies) {
-        console.log(`[Migration] User "${userName}": Legacy .movies key detected in continueWatching.`);
         currentContinue = {
           movie: user.continueWatching.movies.map(item => ({
             id: item.id, movieId: item.movieId || item.id,
@@ -181,12 +167,10 @@ const migrateDatabase = async () => {
       // 3. Re-categorize every item currently in the cartoon watchlist
       const cartoonWatchlist = currentWatchlist.cartoon || [];
       if (cartoonWatchlist.length > 0) {
-        console.log(`[Migration] User "${userName}": Checking ${cartoonWatchlist.length} cartoon watchlist items via TMDB...`);
         for (const item of cartoonWatchlist) {
           const itemId = item.id;
           const isTvHint = item.type === "tv" || !!item.first_air_date;
           const { category } = await determineItemCategory(itemId, isTvHint);
-          console.log(`[Migration]   Watchlist item id=${itemId} title="${item.title || item.name}" → category="${category}"`);
 
           const newItem = { ...item, type: category };
           updatedWatchlist[category].push(newItem);
@@ -195,19 +179,16 @@ const migrateDatabase = async () => {
           }
         }
       } else {
-        // No cartoon items to split - preserve existing cartoon watchlist as-is
         updatedWatchlist.cartoon = currentWatchlist.cartoon || [];
       }
 
       // 4. Re-categorize every item currently in the cartoon continueWatching
       const cartoonContinue = currentContinue.cartoon || [];
       if (cartoonContinue.length > 0) {
-        console.log(`[Migration] User "${userName}": Checking ${cartoonContinue.length} cartoon continueWatching items via TMDB...`);
         for (const item of cartoonContinue) {
           const itemId = item.cartoonId || item.movieId || item.id;
           const isTvHint = item.season !== undefined || item.episode !== undefined;
           const { category } = await determineItemCategory(itemId, isTvHint);
-          console.log(`[Migration]   ContinueWatching item id=${itemId} title="${item.title || item.name}" → category="${category}"`);
 
           if (category === "movie") {
             updatedContinue.movie.push({
@@ -240,13 +221,10 @@ const migrateDatabase = async () => {
           }
         }
       } else {
-        // No cartoon items to split - preserve existing cartoon continueWatching as-is
         updatedContinue.cartoon = currentContinue.cartoon || [];
       }
 
       // 5. Always ensure the `movie` key exists (even if empty)
-      // If the user's DB document doesn't have `watchlist.movie` or `continueWatching.movie`,
-      // we need to add it so the new schema works correctly.
       if (!user.watchlist || user.watchlist.movie === undefined) {
         changed = true;
       }
@@ -255,10 +233,6 @@ const migrateDatabase = async () => {
       }
 
       if (changed) {
-        console.log(`[Migration] User "${userName}": Writing updated data...`);
-        console.log(`[Migration]   Final watchlist: movie=${updatedWatchlist.movie.length}, cartoon=${updatedWatchlist.cartoon.length}, tv=${updatedWatchlist.tv.length}, anime=${updatedWatchlist.anime.length}`);
-        console.log(`[Migration]   Final continueWatching: movie=${updatedContinue.movie.length}, cartoon=${updatedContinue.cartoon.length}, tv=${updatedContinue.tv.length}, anime=${updatedContinue.anime.length}`);
-
         await usersCollection.updateOne(
           { _id: user._id },
           {
@@ -269,15 +243,7 @@ const migrateDatabase = async () => {
           }
         );
         migratedCount++;
-      } else {
-        console.log(`[Migration] User "${userName}": Already up-to-date, no changes needed.`);
       }
-    }
-
-    if (migratedCount > 0) {
-      console.log(`[Migration] Successfully migrated ${migratedCount} user(s).`);
-    } else {
-      console.log("[Migration] All users already up-to-date.");
     }
   } catch (err) {
     console.error("[Migration] Error:", err);
