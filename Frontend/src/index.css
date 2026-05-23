@@ -1,0 +1,33 @@
+@import "tailwindcss";
+.gradient-btn{
+    background: linear-gradient(90deg, #217df5 40%, #E52E71 100%);
+}
+@font-face {
+    font-family:"Inter";
+    src: url('/assets/Inter_18pt-Regular.ttf');
+}
+@font-face {
+    font-family: "ROSSTEN";  
+    src: url('/assets/fonts/ROSSTEN.ttf');
+}
+.search{
+    mix-blend-mode: difference;
+}
+/* .explore{
+    background: linear-gradient(120deg, #000000e8 0%,#000000c9 50%, #111111 100%);
+} */
+.genre::-webkit-scrollbar{
+    display: none;
+    scroll-snap-type: x mandatory;
+}
+.trending::-webkit-scrollbar{
+    display: none;
+    scroll-snap-type: x mandatory;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
