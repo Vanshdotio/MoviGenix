@@ -157,7 +157,7 @@ const Nav = () => {
                         logout();
                         navigate("/profile");
                       }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/5 transition text-left cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/5 transition text-left cursor-pointer border-none bg-transparent"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-red-400/80">
                         <path d="M5 11H13V13H5V16L1 12L5 8V11ZM19 3H9C7.89543 3 7 3.89543 7 5V9H9V5H19V19H9V15H7V19C7 20.1046 7.89543 21 9 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3Z" />

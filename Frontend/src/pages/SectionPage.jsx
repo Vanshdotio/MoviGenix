@@ -202,7 +202,16 @@ const SectionPage = ({ type: propType }) => {
           setHasMore(list.length >= 10);
         }
 
-        setItems(fetchedData);
+        // Safeguard to filter out duplicate items
+        const unique = [];
+        const seen = new Set();
+        for (const item of fetchedData) {
+          if (item && item.id && !seen.has(item.id)) {
+            seen.add(item.id);
+            unique.push(item);
+          }
+        }
+        setItems(unique);
       } catch (err) {
         console.error("Error fetching initial section data:", err);
       } finally {
@@ -233,7 +242,19 @@ const SectionPage = ({ type: propType }) => {
         setHasMore(list.length >= 10);
       }
 
-      setItems((prev) => [...prev, ...newItems]);
+      // Safeguard to filter out duplicate items during infinite scroll append
+      setItems((prev) => {
+        const merged = [...prev, ...newItems];
+        const unique = [];
+        const seen = new Set();
+        for (const item of merged) {
+          if (item && item.id && !seen.has(item.id)) {
+            seen.add(item.id);
+            unique.push(item);
+          }
+        }
+        return unique;
+      });
       setPage(nextPage);
     } catch (err) {
       console.error("Error loading more items:", err);

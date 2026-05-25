@@ -34,9 +34,6 @@ const MediaItemSchema = new mongoose.Schema({
 const MovieContinueWatchingSchema = new mongoose.Schema({
   id: {
     type: String,
-  },
-  movieId: {
-    type: String,
     required: true,
   },
   progress: {
@@ -47,17 +44,11 @@ const MovieContinueWatchingSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  title: {
-    type: String,
-  },
-  poster_path: {
-    type: String,
-  },
   selectedAudio: {
     type: String,
     default: "",
   },
-  watchedAt: {
+  timestamp: {
     type: Date,
     default: Date.now,
   }
@@ -66,9 +57,6 @@ const MovieContinueWatchingSchema = new mongoose.Schema({
 const CartoonContinueWatchingSchema = new mongoose.Schema({
   id: {
     type: String,
-  },
-  cartoonId: {
-    type: String,
     required: true,
   },
   season: {
@@ -85,17 +73,11 @@ const CartoonContinueWatchingSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  title: {
-    type: String,
-  },
-  poster_path: {
-    type: String,
-  },
   selectedAudio: {
     type: String,
     default: "",
   },
-  watchedAt: {
+  timestamp: {
     type: Date,
     default: Date.now,
   }
@@ -104,9 +86,6 @@ const CartoonContinueWatchingSchema = new mongoose.Schema({
 const TVContinueWatchingSchema = new mongoose.Schema({
   id: {
     type: String,
-  },
-  showId: {
-    type: String,
     required: true,
   },
   season: {
@@ -121,17 +100,15 @@ const TVContinueWatchingSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  name: {
-    type: String,
-  },
-  poster_path: {
-    type: String,
+  duration: {
+    type: Number,
+    default: 0,
   },
   selectedAudio: {
     type: String,
     default: "",
   },
-  watchedAt: {
+  timestamp: {
     type: Date,
     default: Date.now,
   }
@@ -140,9 +117,6 @@ const TVContinueWatchingSchema = new mongoose.Schema({
 const AnimeContinueWatchingSchema = new mongoose.Schema({
   id: {
     type: String,
-  },
-  animeId: {
-    type: String,
     required: true,
   },
   season: {
@@ -157,17 +131,15 @@ const AnimeContinueWatchingSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-  name: {
-    type: String,
-  },
-  poster_path: {
-    type: String,
+  duration: {
+    type: Number,
+    default: 0,
   },
   selectedAudio: {
     type: String,
     default: "",
   },
-  watchedAt: {
+  timestamp: {
     type: Date,
     default: Date.now,
   }

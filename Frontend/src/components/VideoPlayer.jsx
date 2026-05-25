@@ -70,6 +70,8 @@ const VideoPlayer = ({
 
   // Initial load
   useEffect(() => {
+    setLoading(true);
+    setPlayerUrl("");
     fetchPlayerUrl(selectedAudio, initialProgress);
   }, [type, id, season, episode]); // Only re-fetch when media changes, not audio
 

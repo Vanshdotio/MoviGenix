@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import VideoPlayer from "../components/VideoPlayer";
 import Loader from "../components/Loader";
 import MediaSlider from "../components/MediaSlider";
+import ProgressiveImage from "../components/ProgressiveImage";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/free-mode";
@@ -430,8 +431,11 @@ const DetailsPage = ({ type: propType }) => {
       {/* Hero Backdrop Banner */}
       <div className="relative w-full min-h-[60vh] md:min-h-[75vh] flex items-end pt-28 md:pt-36">
         {backdropPath ? (
-          <img
-            src={`https://image.tmdb.org/t/p/original${backdropPath}`}
+          <ProgressiveImage
+            lowResSrc={`https://image.tmdb.org/t/p/w300${backdropPath}`}
+            highResSrc={`https://image.tmdb.org/t/p/w1280${backdropPath}`}
+            srcSet={`https://image.tmdb.org/t/p/w780${backdropPath} 768w, https://image.tmdb.org/t/p/w1280${backdropPath} 1280w, https://image.tmdb.org/t/p/original${backdropPath} 1920w`}
+            sizes="100vw"
             alt={title}
             className="absolute inset-0 w-full h-full object-cover animate-fade-in"
           />
@@ -453,12 +457,23 @@ const DetailsPage = ({ type: propType }) => {
 
         <div className="relative max-w-6xl mx-auto w-full px-6 md:px-12 pb-8 md:pb-12 grid grid-cols-1 md:grid-cols-4 gap-8 items-start z-10">
           <div className="hidden md:block col-span-1 aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border border-white/10">
-            <img
-              src={
+            <ProgressiveImage
+              lowResSrc={
                 posterPath
-                  ? `https://image.tmdb.org/t/p/w500${posterPath}`
-                  : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=500&q=80"
+                  ? `https://image.tmdb.org/t/p/w92${posterPath}`
+                  : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=92&q=60"
               }
+              highResSrc={
+                posterPath
+                  ? `https://image.tmdb.org/t/p/w342${posterPath}`
+                  : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=342&q=80"
+              }
+              srcSet={
+                posterPath
+                  ? `https://image.tmdb.org/t/p/w185${posterPath} 180w, https://image.tmdb.org/t/p/w342${posterPath} 360w`
+                  : undefined
+              }
+              sizes="180px"
               alt={title}
               className="w-full h-full object-cover"
             />
@@ -898,10 +913,10 @@ const DetailsPage = ({ type: propType }) => {
                 .filter((season) => season.season_number > 0)
                 .map((season) => {
                   const seasonPoster = season.poster_path
-                    ? `https://image.tmdb.org/t/p/w300${season.poster_path}`
+                    ? `https://image.tmdb.org/t/p/w92${season.poster_path}`
                     : posterPath
-                    ? `https://image.tmdb.org/t/p/w300${posterPath}`
-                    : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=500&q=80";
+                    ? `https://image.tmdb.org/t/p/w92${posterPath}`
+                    : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=92&q=60";
 
                   const isExpanded = expandedSeason === season.season_number;
                   const currentEpisodes = seasonEpisodes[season.season_number] || [];
@@ -954,8 +969,8 @@ const DetailsPage = ({ type: propType }) => {
                             <div className="space-y-6">
                               {currentEpisodes.map((episode) => {
                                 const stillUrl = episode.still_path
-                                  ? `https://image.tmdb.org/t/p/w300${episode.still_path}`
-                                  : "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=300&q=80";
+                                  ? `https://image.tmdb.org/t/p/w185${episode.still_path}`
+                                  : "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=185&q=80";
 
                                 // Check if this specific episode is currently being watched
                                 const isCurrentEpisodeActive =

@@ -1,6 +1,33 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User.model");
 
+// In-memory cache to merge parallel user lookups (e.g. from concurrent home rows)
+const userCache = new Map();
+const USER_CACHE_TTL = 5000; // 5 seconds Time To Live
+
+const getUserFromCacheOrDb = async (userId) => {
+  const cached = userCache.get(userId);
+  const now = Date.now();
+  if (cached && now < cached.expiresAt) {
+    return cached.user;
+  }
+
+  const user = await User.findById(userId).select("-password");
+  if (user) {
+    userCache.set(userId, {
+      user,
+      expiresAt: now + USER_CACHE_TTL
+    });
+  }
+  return user;
+};
+
+const clearUserCache = (userId) => {
+  if (userId) {
+    userCache.delete(String(userId));
+  }
+};
+
 const protect = async (req, res, next) => {
   let token;
 
@@ -23,8 +50,8 @@ const protect = async (req, res, next) => {
     // 3. Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // 4. Fetch user from database
-    const user = await User.findById(decoded.id).select("-password");
+    // 4. Fetch user (using caching to de-dupe concurrent requests)
+    const user = await getUserFromCacheOrDb(decoded.id);
     if (!user) {
       return res.status(404).json({ error: "User associated with this token not found." });
     }
@@ -58,7 +85,7 @@ const optionalProtect = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select("-password");
+    const user = await getUserFromCacheOrDb(decoded.id);
     req.user = user || null;
     next();
   } catch (error) {
@@ -67,4 +94,4 @@ const optionalProtect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect, optionalProtect };
+module.exports = { protect, optionalProtect, clearUserCache };

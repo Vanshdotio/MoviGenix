@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { fetchWithCacheAndDedupe } = require("../utils/tmdbCache");
 const Content = require("../models/Content.model");
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -98,7 +99,7 @@ const getOrFetchContentRating = async (id, type) => {
 
 const filterMediaList = async (items, type, user) => {
   if (!items || items.length === 0) return [];
-  if (!shouldFilter(user)) return items;
+  if (!shouldFilter(user)) return minimizeList(items, type);
 
   let filtered = items.filter((item) => !item.adult);
 
@@ -126,10 +127,14 @@ const filterMediaList = async (items, type, user) => {
         }
       })
     );
-  }  return filtered.filter((item) => {
+  }
+
+  const result = filtered.filter((item) => {
     const itemType = item.media_type || type || "movie";
     return !cachedMap.get(`${itemType}:${item.id}`);
   });
+
+  return minimizeList(result, type);
 };
 
 const filterCartoons = (items) => {
@@ -195,12 +200,20 @@ const getParams = (extraParams = {}) => {
 };
 
 /**
- * Helper to fetch with retries and a small delay on failure
+ * Helper to fetch with retries, timeout, and a small delay on failure.
+ * This is the lower-level Axios caller.
  */
-const fetchWithRetry = async (url, options = {}, retries = 3, delayMs = 200) => {
+const axiosGetWithRetry = async (url, options = {}) => {
+  const mergedOptions = {
+    ...options,
+    timeout: 5000 // 5 seconds request timeout
+  };
+  const retries = 3;
+  const delayMs = 200;
+  
   for (let i = 0; i < retries; i++) {
     try {
-      return await axios.get(url, options);
+      return await axios.get(url, mergedOptions);
     } catch (error) {
       if (i === retries - 1) {
         throw error;
@@ -212,6 +225,61 @@ const fetchWithRetry = async (url, options = {}, retries = 3, delayMs = 200) => 
     }
   }
 };
+
+/**
+ * Cache and de-dupe wrapped fetch helper
+ */
+const fetchWithRetry = async (url, options = {}, retries = 3, delayMs = 200) => {
+  // Leverage our in-memory cache and request de-duplication layer
+  return await fetchWithCacheAndDedupe(url, options, axiosGetWithRetry);
+};
+
+/**
+ * Minimize response payload size by stripping out unused fields for slider lists
+ */
+const minimizeMediaItem = (item, defaultType = "movie") => {
+  if (!item) return null;
+  return {
+    id: item.id,
+    title: item.title,
+    name: item.name,
+    poster_path: item.poster_path,
+    backdrop_path: item.backdrop_path,
+    vote_average: item.vote_average,
+    release_date: item.release_date,
+    first_air_date: item.first_air_date,
+    media_type: item.media_type || defaultType,
+  };
+};
+
+const minimizeList = (list, defaultType = "movie") => {
+  if (!list || !Array.isArray(list)) return [];
+  return list.map(item => minimizeMediaItem(item, defaultType)).filter(Boolean);
+};
+
+/**
+ * Helper to fetch minimal details for Continue Watching history items
+ */
+const getMediaMinimalDetails = async (id, type) => {
+  const actualType = type === "anime" ? "tv" : type;
+  try {
+    const response = await fetchWithRetry(
+      `${TMDB_BASE_URL}/${actualType}/${id}`,
+      getParams()
+    );
+    const data = response.data;
+    return {
+      title: data.title,
+      name: data.name,
+      poster_path: data.poster_path,
+      backdrop_path: data.backdrop_path,
+    };
+  } catch (err) {
+    console.error(`Error enriching item ${id} (${type}):`, err.message);
+    return null;
+  }
+};
+
 
 /**
  * Helper to enrich a list of movies/shows with their logo image paths
@@ -1595,6 +1663,15 @@ const getAvailableLanguages = async (req, res) => {
 
 const getBollywoodMovies = async (req, res) => {
   try {
+    const { page } = req.query;
+    if (page) {
+      const response = await fetchWithRetry(
+        `${TMDB_BASE_URL}/discover/movie`,
+        getParams({ with_original_language: "hi", sort_by: "popularity.desc", page })
+      );
+      const filtered = await filterMediaList(response.data.results, "movie", req.user);
+      return res.json(filtered);
+    }
     const page1 = await fetchWithRetry(
       `${TMDB_BASE_URL}/discover/movie`,
       getParams({ with_original_language: "hi", sort_by: "popularity.desc", page: 1 })
@@ -1614,6 +1691,25 @@ const getBollywoodMovies = async (req, res) => {
 
 const getTollywoodMovies = async (req, res) => {
   try {
+    const { page } = req.query;
+    if (page) {
+      const teluguPage = await fetchWithRetry(
+        `${TMDB_BASE_URL}/discover/movie`,
+        getParams({ with_original_language: "te", sort_by: "popularity.desc", page })
+      );
+      const tamilPage = await fetchWithRetry(
+        `${TMDB_BASE_URL}/discover/movie`,
+        getParams({ with_original_language: "ta", sort_by: "popularity.desc", page })
+      );
+      const merged = [];
+      const len = Math.max(teluguPage.data.results.length, tamilPage.data.results.length);
+      for (let i = 0; i < len; i++) {
+        if (teluguPage.data.results[i]) merged.push(teluguPage.data.results[i]);
+        if (tamilPage.data.results[i]) merged.push(tamilPage.data.results[i]);
+      }
+      const filtered = await filterMediaList(merged, "movie", req.user);
+      return res.json(filtered);
+    }
     const teluguPage1 = await fetchWithRetry(
       `${TMDB_BASE_URL}/discover/movie`,
       getParams({ with_original_language: "te", sort_by: "popularity.desc", page: 1 })
@@ -1717,4 +1813,6 @@ module.exports = {
   getSecureTVPlayerUrl,
   // Audio Languages
   getAvailableLanguages,
+  getMediaMinimalDetails,
+  minimizeList,
 };

@@ -1,10 +1,14 @@
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const compression = require('compression');
 const movieRoutes = require('./routes/movie.routes');
 const authRoutes = require('./routes/auth.routes');
 
 const app = express();
+
+// Register compression middleware early to compress all text/JSON responses
+app.use(compression());
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -35,6 +39,11 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+
+// Keep-alive route to prevent cold starts on hosting providers like Render
+app.get("/ping", (req, res) => {
+  res.status(200).send("pong");
+});
 
 app.use('/api/movies', movieRoutes);
 app.use('/api/auth', authRoutes);

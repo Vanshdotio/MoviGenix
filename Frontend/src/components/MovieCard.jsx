@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import ProgressiveImage from "./ProgressiveImage";
 
 const MovieCard = ({ movie, type = "movie" }) => {
   const navigate = useNavigate();
@@ -8,9 +9,19 @@ const MovieCard = ({ movie, type = "movie" }) => {
 
   const title = movie.title || movie.name || "Untitled";
   const rating = movie.vote_average ? movie.vote_average.toFixed(1) : "N/A";
-  const posterUrl = movie.poster_path
-    ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-    : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=500&q=80"; // Clean aesthetic placeholder
+  
+  // Responsive Image urls (w92 for tiny preview, w342 for high-res cards)
+  const lowResPosterUrl = movie.poster_path
+    ? `https://image.tmdb.org/t/p/w92${movie.poster_path}`
+    : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=92&q=60";
+  
+  const highResPosterUrl = movie.poster_path
+    ? `https://image.tmdb.org/t/p/w342${movie.poster_path}`
+    : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=342&q=80";
+
+  const srcSet = movie.poster_path
+    ? `https://image.tmdb.org/t/p/w185${movie.poster_path} 1x, https://image.tmdb.org/t/p/w342${movie.poster_path} 2x`
+    : undefined;
 
   const cardType = type === "anime" ? "anime" : (movie.media_type || type);
 
@@ -54,8 +65,11 @@ const MovieCard = ({ movie, type = "movie" }) => {
     >
       {/* Image Container */}
       <div className="relative aspect-[2/3] overflow-hidden bg-gray-950">
-        <img
-          src={posterUrl}
+        <ProgressiveImage
+          lowResSrc={lowResPosterUrl}
+          highResSrc={highResPosterUrl}
+          srcSet={srcSet}
+          sizes="180px"
           alt={title}
           loading="lazy"
           className="w-full h-full object-cover 
@@ -134,4 +148,4 @@ const MovieCard = ({ movie, type = "movie" }) => {
   );
 };
 
-export default MovieCard;
+export default React.memo(MovieCard);

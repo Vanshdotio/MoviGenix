@@ -1,8 +1,8 @@
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState } from "react";
 import Loader from "../components/Loader";
 import MediaSlider from "../components/MediaSlider";
-import Swipe from "../components/Swipe";
 import HeroSlider from "../components/HeroSlider";
+import LazyMediaRow from "../components/LazyMediaRow";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -27,87 +27,31 @@ const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Section states
   const [trending, setTrending] = useState([]);
-  const [topRated, setTopRated] = useState([]);
-  const [recommended, setRecommended] = useState([]);
-  const [newReleases, setNewReleases] = useState([]);
-  const [upcoming, setUpcoming] = useState([]);
-  const [action, setAction] = useState([]);
-  const [comedy, setComedy] = useState([]);
-  const [scifi, setScifi] = useState([]);
-  const [crime, setCrime] = useState([]);
-  const [anime, setAnime] = useState([]);
-  const [kdramas, setKdramas] = useState([]);
-  const [mostWatched, setMostWatched] = useState([]);
-  const [awardWinning, setAwardWinning] = useState([]);
-  const [hiddenGems, setHiddenGems] = useState([]);
-  const [editorsPicks, setEditorsPicks] = useState([]);
-  const [becauseYouWatched, setBecauseYouWatched] = useState({ sourceTitle: "", results: [] });
-  const [bollywood, setBollywood] = useState([]);
-  const [tollywood, setTollywood] = useState([]);
-
   const [loading, setLoading] = useState(true);
 
+  // Fetch only the trending items needed for Hero slider on initial load
   useEffect(() => {
-    const fetchHomeData = async () => {
+    const fetchHeroData = async () => {
       try {
-        const endpoints = [
-          getTrendingMovies(),                 // 0
-          getMovieTopRated(),                  // 1
-          getPersonalizedRecommendations(),    // 2
-          getNowPlayingMovies(),               // 3
-          getUpcomingMovies(),                 // 4
-          discoverMedia("movie", "28"),        // 5 (Action & Adventure)
-          discoverMedia("movie", "35"),        // 6 (Comedy)
-          discoverMedia("movie", "878"),       // 7 (Sci-Fi & Fantasy)
-          discoverMedia("movie", "80"),        // 8 (Crime & Thriller)
-          getAnimePopular(),                   // 9
-          getKoreanDramas(),                   // 10
-          getTVTrending(),                     // 11 (Most Watched TV)
-          getAwardWinning(),                   // 12
-          getHiddenGems(),                     // 13
-          getEditorsPicks(),                   // 14
-          getBecauseYouWatched(),              // 15
-          getBollywoodMovies(),                // 16
-          getTollywoodMovies()                 // 17
-        ];
-
-        const results = await Promise.allSettled(endpoints);
-
-        if (results[0].status === "fulfilled") setTrending(results[0].value);
-        if (results[1].status === "fulfilled") setTopRated(results[1].value);
-        if (results[2].status === "fulfilled") setRecommended(results[2].value);
-        if (results[3].status === "fulfilled") setNewReleases(results[3].value);
-        if (results[4].status === "fulfilled") setUpcoming(results[4].value);
-        if (results[5].status === "fulfilled") setAction(results[5].value?.results || []);
-        if (results[6].status === "fulfilled") setComedy(results[6].value?.results || []);
-        if (results[7].status === "fulfilled") setScifi(results[7].value?.results || []);
-        if (results[8].status === "fulfilled") setCrime(results[8].value?.results || []);
-        if (results[9].status === "fulfilled") setAnime(results[9].value || []);
-        if (results[10].status === "fulfilled") setKdramas(results[10].value || []);
-        if (results[11].status === "fulfilled") setMostWatched(results[11].value || []);
-        if (results[12].status === "fulfilled") setAwardWinning(results[12].value || []);
-        if (results[13].status === "fulfilled") setHiddenGems(results[13].value || []);
-        if (results[14].status === "fulfilled") setEditorsPicks(results[14].value || []);
-        if (results[15].status === "fulfilled") setBecauseYouWatched(results[15].value || { sourceTitle: "", results: [] });
-        if (results[16].status === "fulfilled") setBollywood(results[16].value || []);
-        if (results[17].status === "fulfilled") setTollywood(results[17].value || []);
-
+        setLoading(true);
+        const data = await getTrendingMovies();
+        setTrending(data || []);
       } catch (err) {
-        console.error("Error loading home sections data:", err);
+        console.error("Error loading trending movies for hero:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchHomeData();
-  }, [user]); // Re-fetch personalized data if user profile changes
+    fetchHeroData();
+  }, []);
 
   if (loading) {
     return <Loader />;
   }
 
+  // Synchronous lists computed from AuthContext
   const getMergedContinueWatching = () => {
     if (!user || !user.continueWatching) return [];
     if (Array.isArray(user.continueWatching)) return user.continueWatching;
@@ -118,7 +62,7 @@ const Home = () => {
       ...tv.map(item => ({ ...item, type: "tv" })),
       ...anime.map(item => ({ ...item, type: "anime" }))
     ];
-    return all.sort((a, b) => new Date(b.watchedAt) - new Date(a.watchedAt));
+    return all.sort((a, b) => new Date(b.timestamp || b.watchedAt) - new Date(a.timestamp || a.watchedAt));
   };
 
   const getMergedWatchlist = () => {
@@ -140,81 +84,80 @@ const Home = () => {
   return (
     <div className="bg-black min-h-screen w-full pb-20 text-white font-[Inter] overflow-x-hidden">
       {/* Hero Featured Video Banner */}
-      <HeroSlider items={trending.length > 0 ? trending : topRated} type="movie" />
+      <HeroSlider items={trending} type="movie" />
 
       {/* Content Rows */}
       <div className="space-y-2 mt-4">
         
-        {/* 1. Trending Movies */}
+        {/* 1. Trending Movies (Rendered immediately since data is preloaded) */}
         <MediaSlider title="Trending Movies" items={trending} type="movie" viewMoreLink="/movies/trending" />
 
-        {/* 2. Top Rated */}
-        <MediaSlider title="Top Rated Content" items={topRated} type="movie" viewMoreLink="/movies/top-rated" />
+        {/* 2. Top Rated Content (Lazy loaded on scroll) */}
+        <LazyMediaRow title="Top Rated Content" fetchFn={getMovieTopRated} type="movie" viewMoreLink="/movies/top-rated" />
 
         {/* Bollywood Hits */}
-        {bollywood.length > 0 && (
-          <MediaSlider title="Bollywood Hits" items={bollywood} type="movie" viewMoreLink="/movies/bollywood" />
-        )}
+        <LazyMediaRow title="Bollywood Hits" fetchFn={getBollywoodMovies} type="movie" viewMoreLink="/movies/bollywood" />
 
         {/* Tollywood & South Cinema */}
-        {tollywood.length > 0 && (
-          <MediaSlider title="Tollywood & South Cinema" items={tollywood} type="movie" viewMoreLink="/movies/tollywood" />
-        )}
+        <LazyMediaRow title="Tollywood & South Cinema" fetchFn={getTollywoodMovies} type="movie" viewMoreLink="/movies/tollywood" />
 
-        {/* 3. Continue Watching (Only for Logged-In Users with history) */}
+        {/* 3. Continue Watching (Instant render from local auth profile state) */}
         {user && mergedContinue.length > 0 && (
           <MediaSlider title="Continue Watching" items={mergedContinue} type="movie" />
         )}
 
-        {/* 4. Recommended For You */}
-        <MediaSlider 
+        {/* 4. Recommended For You (Personalized - Lazy loaded) */}
+        <LazyMediaRow 
           title={user ? "Recommended For You" : "Recommended Blockbusters"} 
-          items={recommended} 
+          fetchFn={getPersonalizedRecommendations} 
           type="movie" 
           viewMoreLink="/movies/recommended"
+          isAuthRequired={false} // falls back to popular if logged out
         />
 
         {/* 5. New Releases */}
-        <MediaSlider title="New Releases" items={newReleases} type="movie" viewMoreLink="/movies/new-releases" />
+        <LazyMediaRow title="New Releases" fetchFn={getNowPlayingMovies} type="movie" viewMoreLink="/movies/new-releases" />
 
         {/* 6. Upcoming / Coming Soon */}
-        <MediaSlider title="Coming Soon" items={upcoming} type="movie" viewMoreLink="/movies/upcoming" />
+        <LazyMediaRow title="Coming Soon" fetchFn={getUpcomingMovies} type="movie" viewMoreLink="/movies/upcoming" />
 
         {/* 7. Genre Collections */}
-        <MediaSlider title="Action & Adventure" items={action} type="movie" viewMoreLink="/movies/action" />
-        <MediaSlider title="Comedy Specials" items={comedy} type="movie" viewMoreLink="/movies/comedy" />
-        <MediaSlider title="Sci-Fi & Fantasy" items={scifi} type="movie" viewMoreLink="/movies/scifi" />
-        <MediaSlider title="Crime & Thrillers" items={crime} type="movie" viewMoreLink="/movies/crime" />
+        <LazyMediaRow title="Action & Adventure" fetchFn={() => discoverMedia("movie", "28")} type="movie" viewMoreLink="/movies/action" />
+        <LazyMediaRow title="Comedy Specials" fetchFn={() => discoverMedia("movie", "35")} type="movie" viewMoreLink="/movies/comedy" />
+        <LazyMediaRow title="Sci-Fi & Fantasy" fetchFn={() => discoverMedia("movie", "878")} type="movie" viewMoreLink="/movies/scifi" />
+        <LazyMediaRow title="Crime & Thrillers" fetchFn={() => discoverMedia("movie", "80")} type="movie" viewMoreLink="/movies/crime" />
 
         {/* 8. Anime Collection */}
-        <MediaSlider title="Anime Collection" items={anime} type="tv" viewMoreLink="/anime/trending" />
+        <LazyMediaRow title="Anime Collection" fetchFn={getAnimePopular} type="tv" viewMoreLink="/anime/trending" />
 
         {/* 9. Korean Dramas */}
-        <MediaSlider title="Korean Dramas" items={kdramas} type="tv" viewMoreLink="/tv/kdramas" />
+        <LazyMediaRow title="Korean Dramas" fetchFn={getKoreanDramas} type="tv" viewMoreLink="/tv/kdramas" />
 
         {/* 10. Most Watched This Week */}
-        <MediaSlider title="Most Watched This Week" items={mostWatched} type="tv" viewMoreLink="/tv/trending" />
+        <LazyMediaRow title="Most Watched This Week" fetchFn={getTVTrending} type="tv" viewMoreLink="/tv/trending" />
 
         {/* 11. Award Winning Shows */}
-        <MediaSlider title="Award Winning Shows" items={awardWinning} type="movie" viewMoreLink="/movies/award-winning" />
+        <LazyMediaRow title="Award Winning Shows" fetchFn={getAwardWinning} type="movie" viewMoreLink="/movies/award-winning" />
 
         {/* 12. Hidden Gems */}
-        <MediaSlider title="Hidden Gems" items={hiddenGems} type="movie" viewMoreLink="/movies/hidden-gems" />
+        <LazyMediaRow title="Hidden Gems" fetchFn={getHiddenGems} type="movie" viewMoreLink="/movies/hidden-gems" />
 
         {/* 13. Editor's Picks */}
-        <MediaSlider title="Editor's Picks" items={editorsPicks} type="movie" viewMoreLink="/movies/editors-picks" />
+        <LazyMediaRow title="Editor's Picks" fetchFn={getEditorsPicks} type="movie" viewMoreLink="/movies/editors-picks" />
 
-        {/* 14. Because You Watched [Dynamic Title] */}
-        {becauseYouWatched.results && becauseYouWatched.results.length > 0 && (
-          <MediaSlider 
-            title={`Because You Watched: ${becauseYouWatched.sourceTitle}`} 
-            items={becauseYouWatched.results} 
+        {/* 14. Because You Watched (Personalized - Lazy loaded) */}
+        {user && (
+          <LazyMediaRow 
+            title="Because You Watched" 
+            fetchFn={getBecauseYouWatched} 
             type="movie" 
             viewMoreLink="/movies/because-you-watched"
+            isAuthRequired={true}
+            isDynamic={true}
           />
         )}
 
-        {/* 15. Continue From Last Session Banner */}
+        {/* 15. Continue From Last Session Banner (Synchronous from profile) */}
         {lastSessionItem && (
           <div className="px-8 md:px-12 py-10 w-full bg-black">
             <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-zinc-950/60 shadow-2xl flex flex-col md:flex-row items-center justify-between p-6 sm:p-8 backdrop-blur-xl">
@@ -241,7 +184,7 @@ const Home = () => {
                     {lastSessionItem.title || lastSessionItem.name}
                   </h3>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    Last active: {new Date(lastSessionItem.watchedAt).toLocaleDateString("en-US", {
+                    Last active: {new Date(lastSessionItem.timestamp || lastSessionItem.watchedAt).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
                       hour: "2-digit",
@@ -253,7 +196,7 @@ const Home = () => {
 
               <button
                 onClick={() => navigate(`/${lastSessionItem.type}/${lastSessionItem.id}`)}
-                className="relative z-10 mt-6 md:mt-0 gradient-btn text-white text-sm font-semibold px-6 py-3 rounded-xl flex items-center gap-2 active:scale-95 transition-all shadow-lg hover:shadow-pink-500/10 cursor-pointer"
+                className="relative z-10 mt-6 md:mt-0 gradient-btn text-white text-sm font-semibold px-6 py-3 rounded-xl flex items-center gap-2 active:scale-95 transition-all shadow-lg hover:shadow-pink-500/10 cursor-pointer border-none"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
                   <path d="M8 5V19L19 12L8 5Z" />
@@ -264,12 +207,12 @@ const Home = () => {
           </div>
         )}
 
-        {/* 16. Recently Viewed */}
+        {/* 16. Recently Viewed History (Synchronous from profile) */}
         {user && mergedContinue.length > 0 && (
           <MediaSlider title="Recently Viewed History" items={mergedContinue} type="movie" />
         )}
 
-        {/* 17. Watchlist */}
+        {/* 17. Watchlist (Synchronous from profile) */}
         {user && mergedWatchlist.length > 0 && (
           <MediaSlider title="My Watchlist" items={mergedWatchlist} type="movie" />
         )}
