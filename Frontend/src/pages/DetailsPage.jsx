@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { getMediaDetails, getTVSeasonDetails } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import VideoPlayer from "../components/VideoPlayer";
+const VideoPlayer = React.lazy(() => import("../components/VideoPlayer"));
 import Loader from "../components/Loader";
 import MediaSlider from "../components/MediaSlider";
 import ProgressiveImage from "../components/ProgressiveImage";
@@ -36,6 +36,7 @@ const DetailsPage = ({ type: propType }) => {
   const [media, setMedia] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [loadTrailer, setLoadTrailer] = useState(false);
 
   // Accordion state for seasons/episodes
   const [expandedSeason, setExpandedSeason] = useState(null);
@@ -61,6 +62,7 @@ const DetailsPage = ({ type: propType }) => {
         setError(null);
         setExpandedSeason(null);
         setSeasonEpisodes({});
+        setLoadTrailer(false);
         const data = await getMediaDetails(apiType, id);
         setMedia(data);
       } catch (err) {
@@ -224,7 +226,6 @@ const DetailsPage = ({ type: propType }) => {
     setPlaybackTime(initialTime);
     setSelectedAudio(initialAudio);
 
-    // Immediately register/update Continue Watching history
     const mediaPayload = {
       id: String(id),
       type: item.type,
@@ -239,6 +240,18 @@ const DetailsPage = ({ type: propType }) => {
       mediaPayload.season = item.season;
       mediaPayload.episode = item.episode;
     }
+
+    if (!isItemMovie && item.season && !seasonEpisodes[item.season]) {
+      getTVSeasonDetails(id, item.season)
+        .then((data) => {
+          setSeasonEpisodes((prev) => ({
+            ...prev,
+            [item.season]: data.episodes || [],
+          }));
+        })
+        .catch((err) => console.error("Error prefetching episodes for player:", err));
+    }
+
     addContinueWatching(mediaPayload);
   };
 
@@ -305,7 +318,7 @@ const DetailsPage = ({ type: propType }) => {
 
   // TV / Anime Next Episode Logic
   const getNextEpisodeInfo = () => {
-    if (isMovie || !currentContinueItem) return null;
+    if (isMovie || !media || !currentContinueItem) return null;
     const s = currentContinueItem.season || 1;
     const e = currentContinueItem.episode || 1;
 
@@ -429,13 +442,10 @@ const DetailsPage = ({ type: propType }) => {
   return (
     <div className="min-h-screen bg-black text-white pb-16 font-[Inter]">
       {/* Hero Backdrop Banner */}
-      <div className="relative w-full min-h-[60vh] md:min-h-[75vh] flex items-end pt-28 md:pt-36">
+      <div className="relative w-full min-h-[60vh] md:min-h-[75vh] flex items-end pt-36 md:pt-44">
         {backdropPath ? (
-          <ProgressiveImage
-            lowResSrc={`https://image.tmdb.org/t/p/w300${backdropPath}`}
-            highResSrc={`https://image.tmdb.org/t/p/w1280${backdropPath}`}
-            srcSet={`https://image.tmdb.org/t/p/w780${backdropPath} 768w, https://image.tmdb.org/t/p/w1280${backdropPath} 1280w, https://image.tmdb.org/t/p/original${backdropPath} 1920w`}
-            sizes="100vw"
+          <img
+            src={`https://image.tmdb.org/t/p/original${backdropPath}`}
             alt={title}
             className="absolute inset-0 w-full h-full object-cover animate-fade-in"
           />
@@ -448,7 +458,8 @@ const DetailsPage = ({ type: propType }) => {
 
         <button
           onClick={handleBack}
-          className="absolute top-24 left-6 md:left-12 flex items-center justify-center bg-black/60 hover:bg-black/80 text-white rounded-full p-2.5 backdrop-blur-md border border-white/10 transition z-20 cursor-pointer"
+          aria-label="Go Back"
+          className="absolute top-20 md:top-24 left-6 md:left-12 flex items-center justify-center bg-black/60 hover:bg-black/80 text-white rounded-full p-2.5 backdrop-blur-md border border-white/10 transition z-20 cursor-pointer"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
             <path d="M7.82843 10.9999H20V12.9999H7.82843L13.1924 18.3638L11.7782 19.778L4 11.9999L11.7782 4.22168L13.1924 5.63589L7.82843 10.9999Z"></path>
@@ -457,23 +468,12 @@ const DetailsPage = ({ type: propType }) => {
 
         <div className="relative max-w-6xl mx-auto w-full px-6 md:px-12 pb-8 md:pb-12 grid grid-cols-1 md:grid-cols-4 gap-8 items-start z-10">
           <div className="hidden md:block col-span-1 aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border border-white/10">
-            <ProgressiveImage
-              lowResSrc={
+            <img
+              src={
                 posterPath
-                  ? `https://image.tmdb.org/t/p/w92${posterPath}`
-                  : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=92&q=60"
+                  ? `https://image.tmdb.org/t/p/w500${posterPath}`
+                  : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=500&q=80"
               }
-              highResSrc={
-                posterPath
-                  ? `https://image.tmdb.org/t/p/w342${posterPath}`
-                  : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&w=342&q=80"
-              }
-              srcSet={
-                posterPath
-                  ? `https://image.tmdb.org/t/p/w185${posterPath} 180w, https://image.tmdb.org/t/p/w342${posterPath} 360w`
-                  : undefined
-              }
-              sizes="180px"
               alt={title}
               className="w-full h-full object-cover"
             />
@@ -524,10 +524,10 @@ const DetailsPage = ({ type: propType }) => {
                 <span className="font-semibold text-sm md:text-base">{rating} / 10</span>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                 {/* Play Buttons: Watch Now & Resume/Continue Watching */}
                 {isMovie ? (
-                  <div className="flex gap-2 flex-wrap">
+                  <>
                     <button
                       onClick={() => startPlayback({ type: type, title, duration: (runtime || 120) * 60 }, true)}
                       className="bg-white/10 hover:bg-white/20 border border-white/10 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
@@ -549,9 +549,9 @@ const DetailsPage = ({ type: propType }) => {
                         Resume Watching ({formatTime(currentContinueItem.progress)})
                       </button>
                     )}
-                  </div>
+                  </>
                 ) : (
-                  <div className="flex gap-2 flex-wrap">
+                  <>
                     <button
                       onClick={() =>
                         startPlayback({
@@ -589,7 +589,7 @@ const DetailsPage = ({ type: propType }) => {
                         Continue Episode S{currentContinueItem.season}E{currentContinueItem.episode}
                       </button>
                     )}
-                  </div>
+                  </>
                 )}
 
                 <button
@@ -815,6 +815,8 @@ const DetailsPage = ({ type: propType }) => {
                 <img
                   src={`https://image.tmdb.org/t/p/w92${media.belongs_to_collection.poster_path}`}
                   alt=""
+                  width={48}
+                  height={72}
                   className="w-12 h-18 object-cover rounded shadow"
                 />
                 <div>
@@ -859,6 +861,8 @@ const DetailsPage = ({ type: propType }) => {
                           <img
                             src={profileImg}
                             alt={actor.name}
+                            width={128}
+                            height={192}
                             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                             loading="lazy"
                           />
@@ -885,14 +889,32 @@ const DetailsPage = ({ type: propType }) => {
               <h2 className="text-2xl font-bold mb-4 border-l-4 border-yellow-400 pl-3">
                 Official Trailer
               </h2>
-              <div className="relative w-full aspect-video rounded-xl overflow-hidden shadow-2xl border border-white/5">
-                <iframe
-                  className="absolute inset-0 w-full h-full"
-                  src={`https://www.youtube.com/embed/${trailerKey}?rel=0&modestbranding=1`}
-                  title={`${title} Trailer`}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                ></iframe>
+              <div className="relative w-full aspect-video rounded-xl overflow-hidden shadow-2xl border border-white/5 bg-zinc-950">
+                {loadTrailer ? (
+                  <iframe
+                    className="absolute inset-0 w-full h-full"
+                    src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&rel=0&modestbranding=1`}
+                    title={`${title} Trailer`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  ></iframe>
+                ) : (
+                  <div 
+                    onClick={() => setLoadTrailer(true)}
+                    className="absolute inset-0 w-full h-full cursor-pointer group flex items-center justify-center bg-cover bg-center"
+                    style={{ backgroundImage: backdropPath ? `url(https://image.tmdb.org/t/p/w780${backdropPath})` : "none" }}
+                  >
+                    {/* Dark overlay */}
+                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/60 transition-colors duration-300"></div>
+                    
+                    {/* Play Icon */}
+                    <div className="relative z-10 w-16 h-16 rounded-full bg-red-600 group-hover:bg-red-500 text-white flex items-center justify-center shadow-xl group-hover:scale-110 transition-all duration-300">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 ml-1">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -935,6 +957,8 @@ const DetailsPage = ({ type: propType }) => {
                           <img
                             src={seasonPoster}
                             alt={season.name}
+                            width={48}
+                            height={72}
                             className="w-12 aspect-[2/3] object-cover rounded shadow"
                             loading="lazy"
                           />
@@ -1003,6 +1027,8 @@ const DetailsPage = ({ type: propType }) => {
                                       <img
                                         src={stillUrl}
                                         alt={episode.name}
+                                        width={176}
+                                        height={99}
                                         className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
                                         loading="lazy"
                                       />
@@ -1100,23 +1126,40 @@ const DetailsPage = ({ type: propType }) => {
 
       {/* Premium Media Player Modal Overlay */}
       {playingVideo && (
-        <VideoPlayer
-          type={playingVideo.type}
-          id={id}
-          season={playingVideo.season}
-          episode={playingVideo.episode}
-          title={playingVideo.type === "movie" ? (media.title || media.name) : `${media.name || media.title} - S${playingVideo.season}E${playingVideo.episode}`}
-          posterPath={media.poster_path}
-          initialProgress={playbackTime}
-          onProgressUpdate={handlePlayerProgress}
-          onClose={handleClosePlayer}
-          onNextEpisode={playNextEpisode}
-          nextEpisodeAvailable={!!nextEpisode}
-          availableLanguages={media?.available_audio_languages || []}
-          originalLanguage={media?.original_language || ""}
-          initialAudio={selectedAudio}
-          onAudioChange={handleAudioChange}
-        />
+        <Suspense fallback={
+          <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center gap-3">
+            <Loader />
+            <p className="text-yellow-400 font-bold font-[Inter] text-sm animate-pulse">Loading Premium Player...</p>
+          </div>
+        }>
+          <VideoPlayer
+            type={playingVideo.type}
+            id={id}
+            season={playingVideo.season}
+            episode={playingVideo.episode}
+            title={playingVideo.type === "movie" ? (media.title || media.name) : `${media.name || media.title} - S${playingVideo.season}E${playingVideo.episode}`}
+            posterPath={media.poster_path}
+            initialProgress={playbackTime}
+            onProgressUpdate={handlePlayerProgress}
+            onClose={handleClosePlayer}
+            onNextEpisode={playNextEpisode}
+            nextEpisodeAvailable={!!nextEpisode}
+            availableLanguages={media?.available_audio_languages || []}
+            originalLanguage={media?.original_language || ""}
+            initialAudio={selectedAudio}
+            onAudioChange={handleAudioChange}
+            episodes={seasonEpisodes[playingVideo.season] || []}
+            onPlayEpisode={(episodeNumber) => {
+              startPlayback({
+                type: playingVideo.type,
+                season: playingVideo.season,
+                episode: episodeNumber,
+                title: `S${playingVideo.season}E${episodeNumber}`,
+                duration: playingVideo.type === "anime" ? 1440 : 2700,
+              });
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

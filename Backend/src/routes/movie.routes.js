@@ -171,7 +171,7 @@ router.get("/k-dramas", cacheMiddleware(300), getKoreanDramas);
 router.get("/hidden-gems", cacheMiddleware(300), getHiddenGems);
 router.get("/editors-picks", cacheMiddleware(300), getEditorsPicks);
 router.get("/award-winning", cacheMiddleware(300), getAwardWinning);
-router.get("/recommendations", optionalProtect, getPersonalizedRecommendations);
-router.get("/because-you-watched", optionalProtect, getBecauseYouWatched);
+router.get("/recommendations", optionalProtect, cacheMiddleware(60), getPersonalizedRecommendations);
+router.get("/because-you-watched", optionalProtect, cacheMiddleware(60), getBecauseYouWatched);
 
 module.exports = router;

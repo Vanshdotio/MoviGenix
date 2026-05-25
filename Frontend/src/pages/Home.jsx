@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Loader from "../components/Loader";
 import MediaSlider from "../components/MediaSlider";
 import HeroSlider from "../components/HeroSlider";
@@ -87,7 +87,7 @@ const Home = () => {
       <HeroSlider items={trending} type="movie" />
 
       {/* Content Rows */}
-      <div className="space-y-2 mt-4">
+      <div className="relative z-20 -mt-16 md:-mt-24 space-y-2">
         
         {/* 1. Trending Movies (Rendered immediately since data is preloaded) */}
         <MediaSlider title="Trending Movies" items={trending} type="movie" viewMoreLink="/movies/trending" />
@@ -139,8 +139,6 @@ const Home = () => {
         {/* 11. Award Winning Shows */}
         <LazyMediaRow title="Award Winning Shows" fetchFn={getAwardWinning} type="movie" viewMoreLink="/movies/award-winning" />
 
-        {/* 12. Hidden Gems */}
-        <LazyMediaRow title="Hidden Gems" fetchFn={getHiddenGems} type="movie" viewMoreLink="/movies/hidden-gems" />
 
         {/* 13. Editor's Picks */}
         <LazyMediaRow title="Editor's Picks" fetchFn={getEditorsPicks} type="movie" viewMoreLink="/movies/editors-picks" />
@@ -166,6 +164,9 @@ const Home = () => {
                 <img
                   src={`https://image.tmdb.org/t/p/w780${lastSessionItem.poster_path}`}
                   alt=""
+                  width={1200}
+                  height={200}
+                  loading="lazy"
                   className="w-full h-full object-cover filter blur-sm scale-110"
                 />
               </div>
@@ -174,6 +175,9 @@ const Home = () => {
                 <img
                   src={`https://image.tmdb.org/t/p/w185${lastSessionItem.poster_path}`}
                   alt={lastSessionItem.title || lastSessionItem.name}
+                  width={64}
+                  height={96}
+                  loading="lazy"
                   className="w-16 h-24 rounded-lg object-cover border border-white/10"
                 />
                 <div>
@@ -207,15 +211,6 @@ const Home = () => {
           </div>
         )}
 
-        {/* 16. Recently Viewed History (Synchronous from profile) */}
-        {user && mergedContinue.length > 0 && (
-          <MediaSlider title="Recently Viewed History" items={mergedContinue} type="movie" />
-        )}
-
-        {/* 17. Watchlist (Synchronous from profile) */}
-        {user && mergedWatchlist.length > 0 && (
-          <MediaSlider title="My Watchlist" items={mergedWatchlist} type="movie" />
-        )}
 
       </div>
     </div>

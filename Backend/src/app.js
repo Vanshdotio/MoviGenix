@@ -4,6 +4,8 @@ const cookieParser = require('cookie-parser');
 const compression = require('compression');
 const movieRoutes = require('./routes/movie.routes');
 const authRoutes = require('./routes/auth.routes');
+const performanceMiddleware = require('./middlewares/performance');
+const errorMiddleware = require('./middlewares/error');
 
 const app = express();
 
@@ -39,6 +41,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(performanceMiddleware);
 
 // Keep-alive route to prevent cold starts on hosting providers like Render
 app.get("/ping", (req, res) => {
@@ -47,5 +50,8 @@ app.get("/ping", (req, res) => {
 
 app.use('/api/movies', movieRoutes);
 app.use('/api/auth', authRoutes);
+
+// Global Error Handler
+app.use(errorMiddleware);
 
 module.exports = app;

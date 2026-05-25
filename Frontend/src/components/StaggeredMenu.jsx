@@ -326,6 +326,9 @@ export const StaggeredMenu = ({
                             <img
                               src={it.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(it.name)}`}
                               alt={it.name}
+                              width={40}
+                              height={40}
+                              loading="lazy"
                               className="w-10 h-10 rounded-full object-cover border border-[#e52e71]/30"
                             />
                             <div className="flex flex-col text-left">

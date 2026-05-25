@@ -79,4 +79,4 @@ const MediaSlider = ({ title, items = [], type = "movie", viewMoreLink }) => {
   );
 };
 
-export default MediaSlider;
+export default React.memo(MediaSlider);

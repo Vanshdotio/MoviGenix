@@ -100,6 +100,8 @@ const SignupPage = () => {
             <img
               src={`https://image.tmdb.org/t/p/w300${path}`}
               alt=""
+              width={150}
+              height={225}
               className="w-full h-full object-cover"
               loading="lazy"
             />
@@ -124,6 +126,8 @@ const SignupPage = () => {
             <img
               src="/assets/Pi7_Tool_movie recommendation logo.png"
               alt="Logo"
+              width={180}
+              height={48}
               className="h-12 mx-auto mb-4 cursor-pointer"
             />
           </Link>

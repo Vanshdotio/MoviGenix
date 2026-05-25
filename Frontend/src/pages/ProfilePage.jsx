@@ -287,6 +287,8 @@ const ProfilePage = () => {
             <img
               src={avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user?.name || "User")}`}
               alt={user?.name}
+              width={112}
+              height={112}
               className="w-full h-full object-cover"
             />
           </div>
@@ -421,7 +423,14 @@ const ProfilePage = () => {
                           avatar === preset ? "border-yellow-400 bg-zinc-800" : "border-transparent bg-zinc-900"
                         }`}
                       >
-                        <img src={preset} alt="" className="w-full h-full object-cover" />
+                        <img 
+                          src={preset} 
+                          alt="" 
+                          width={64} 
+                          height={64} 
+                          loading="lazy" 
+                          className="w-full h-full object-cover" 
+                        />
                       </button>
                     ))}
                   </div>

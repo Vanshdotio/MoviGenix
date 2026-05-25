@@ -243,6 +243,7 @@ const minimizeMediaItem = (item, defaultType = "movie") => {
     id: item.id,
     title: item.title,
     name: item.name,
+    overview: item.overview,
     poster_path: item.poster_path,
     backdrop_path: item.backdrop_path,
     vote_average: item.vote_average,
@@ -1554,7 +1555,7 @@ const getAnimeCollection = async (req, res) => {
 const getSecureMoviePlayerUrl = async (req, res) => {
   try {
     const { id } = req.params;
-    const { color, progress, audio } = req.query;
+    const { color, progress, audio, autoplay, server } = req.query;
 
     if (!id) {
       return res.status(400).json({ error: "Movie ID is required" });
@@ -1566,15 +1567,21 @@ const getSecureMoviePlayerUrl = async (req, res) => {
       return res.status(403).json({ error: "Access denied. This content is age restricted.", isAdultContent: true });
     }
 
-    const baseUrl = process.env.VIDKING_BASE_URL || "https://www.vidking.net";
-    
-    const queryParams = new URLSearchParams();
-    if (color) queryParams.append("color", color);
-    if (progress) queryParams.append("progress", progress);
-    if (audio && audio !== "original") queryParams.append("audio", audio);
-
-    const queryString = queryParams.toString();
-    const playerUrl = `${baseUrl}/embed/movie/${id}${queryString ? `?${queryString}` : ""}`;
+    let playerUrl;
+    if (server === "vidsrc") {
+      playerUrl = `https://vidsrc.to/embed/movie/${id}`;
+    } else if (server === "vidlink") {
+      playerUrl = `https://vidlink.pro/embed/movie/${id}`;
+    } else {
+      const baseUrl = process.env.VIDKING_BASE_URL || "https://www.vidking.net";
+      const queryParams = new URLSearchParams();
+      if (color) queryParams.append("color", color);
+      if (progress) queryParams.append("progress", progress);
+      if (audio && audio !== "original") queryParams.append("audio", audio);
+      if (autoplay) queryParams.append("autoplay", autoplay);
+      const queryString = queryParams.toString();
+      playerUrl = `${baseUrl}/embed/movie/${id}${queryString ? `?${queryString}` : ""}`;
+    }
 
     res.json({ playerUrl });
   } catch (error) {
@@ -1586,7 +1593,7 @@ const getSecureMoviePlayerUrl = async (req, res) => {
 const getSecureTVPlayerUrl = async (req, res) => {
   try {
     const { id, season, episode } = req.params;
-    const { color, progress, nextEpisode, episodeSelector, audio } = req.query;
+    const { color, progress, nextEpisode, episodeSelector, audio, autoplay, server } = req.query;
 
     if (!id || !season || !episode) {
       return res.status(400).json({ error: "Show ID, season, and episode are required" });
@@ -1598,17 +1605,23 @@ const getSecureTVPlayerUrl = async (req, res) => {
       return res.status(403).json({ error: "Access denied. This content is age restricted.", isAdultContent: true });
     }
 
-    const baseUrl = process.env.VIDKING_BASE_URL || "https://www.vidking.net";
-    
-    const queryParams = new URLSearchParams();
-    if (color) queryParams.append("color", color);
-    if (progress) queryParams.append("progress", progress);
-    if (nextEpisode) queryParams.append("nextEpisode", nextEpisode);
-    if (episodeSelector) queryParams.append("episodeSelector", episodeSelector);
-    if (audio && audio !== "original") queryParams.append("audio", audio);
-
-    const queryString = queryParams.toString();
-    const playerUrl = `${baseUrl}/embed/tv/${id}/${season}/${episode}${queryString ? `?${queryString}` : ""}`;
+    let playerUrl;
+    if (server === "vidsrc") {
+      playerUrl = `https://vidsrc.to/embed/tv/${id}/${season}/${episode}`;
+    } else if (server === "vidlink") {
+      playerUrl = `https://vidlink.pro/embed/tv/${id}/${season}/${episode}`;
+    } else {
+      const baseUrl = process.env.VIDKING_BASE_URL || "https://www.vidking.net";
+      const queryParams = new URLSearchParams();
+      if (color) queryParams.append("color", color);
+      if (progress) queryParams.append("progress", progress);
+      if (nextEpisode) queryParams.append("nextEpisode", nextEpisode);
+      if (episodeSelector) queryParams.append("episodeSelector", episodeSelector);
+      if (audio && audio !== "original") queryParams.append("audio", audio);
+      if (autoplay) queryParams.append("autoplay", autoplay);
+      const queryString = queryParams.toString();
+      playerUrl = `${baseUrl}/embed/tv/${id}/${season}/${episode}${queryString ? `?${queryString}` : ""}`;
+    }
 
     res.json({ playerUrl });
   } catch (error) {

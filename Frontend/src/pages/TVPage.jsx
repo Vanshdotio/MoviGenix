@@ -107,7 +107,7 @@ const TVPage = () => {
       <HeroSlider items={trendingTV.length > 0 ? trendingTV : popularTV} type="tv" />
 
       {/* Standard Landing View with TV Sections */}
-      <div className="space-y-2 mt-4">
+      <div className="relative z-20 -mt-16 md:-mt-24 space-y-2">
         {/* 1. Continue Watching (TV only) */}
         {user && continueWatching.length > 0 && (
           <MediaSlider title="Continue Watching" items={continueWatching} type="tv" />
@@ -137,8 +137,6 @@ const TVPage = () => {
         {/* 9. Indian Reality Shows */}
         <MediaSlider title="Indian Reality Shows" items={reality} type="tv" viewMoreLink="/tv/reality" />
 
-        {/* 10. Hidden Gems */}
-        <MediaSlider title="Hidden Gems" items={hiddenGems} type="tv" viewMoreLink="/tv/hidden-gems" />
 
         {/* 11. Trending International */}
         <MediaSlider title="Trending International" items={trendingInternational} type="tv" viewMoreLink="/tv/trending-international" />

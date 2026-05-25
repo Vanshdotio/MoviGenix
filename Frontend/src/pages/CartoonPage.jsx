@@ -99,6 +99,7 @@ const CartoonPage = () => {
   // Get user continueWatching and watchlist specifically for cartoons
   const continueWatching = getContinueWatching("cartoon");
   const watchlist = getWatchlist("cartoon");
+  const lastSessionItem = continueWatching[0] || null;
 
   return (
     <div className="min-h-screen bg-black text-white pb-12 select-none font-[Inter]">
@@ -106,7 +107,7 @@ const CartoonPage = () => {
       <HeroSlider items={trending.length > 0 ? trending : popular} type="cartoon" />
 
       {/* Standard Landing View with Cartoon Sections */}
-      <div className="space-y-2 mt-4">
+      <div className="relative z-20 -mt-16 md:-mt-24 space-y-2">
         {/* 1. Continue Watching (Cartoons only) */}
         {user && continueWatching.length > 0 && (
           <MediaSlider title="Continue Watching" items={continueWatching} type="cartoon" />
@@ -139,8 +140,6 @@ const CartoonPage = () => {
         {/* 10. Comedy Cartoons */}
         <MediaSlider title="Comedy Cartoons" items={comedy} type="cartoon" viewMoreLink="/cartoon/comedy" />
 
-        {/* 11. Cartoon Hidden Gems */}
-        <MediaSlider title="Hidden Gems" items={hiddenGems} type="cartoon" viewMoreLink="/cartoon/hidden-gems" />
 
         {/* 12. Editor's Picks */}
         <MediaSlider title="Editor's Picks" items={editorsPicks} type="cartoon" viewMoreLink="/cartoon/editors-picks" />
@@ -168,6 +167,59 @@ const CartoonPage = () => {
           <MediaSlider title="Cartoon Watchlist" items={watchlist} type="cartoon" />
         )}
       </div>
+
+      {/* Continue From Last Episode (Cartoon banner at the bottom) */}
+      {lastSessionItem && (
+        <div className="px-8 md:px-12 py-10 w-full bg-black">
+          <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-zinc-950/60 shadow-2xl flex flex-col md:flex-row items-center justify-between p-6 sm:p-8 backdrop-blur-xl">
+            {/* background thumbnail watermark */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none">
+              <img
+                src={`https://image.tmdb.org/t/p/w780${lastSessionItem.poster_path}`}
+                alt=""
+                className="w-full h-full object-cover filter blur-sm scale-110"
+              />
+            </div>
+
+            <div className="relative z-10 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+              <img
+                src={`https://image.tmdb.org/t/p/w185${lastSessionItem.poster_path}`}
+                alt={lastSessionItem.title || lastSessionItem.name}
+                className="w-16 h-24 rounded-lg object-cover border border-white/10"
+              />
+              <div>
+                <span className="text-[10px] text-yellow-400 font-bold uppercase tracking-widest">
+                  Continue From Last Episode
+                </span>
+                <h3 className="text-xl sm:text-2xl font-bold text-white mt-1">
+                  {lastSessionItem.title || lastSessionItem.name}
+                </h3>
+                <p className="text-xs text-zinc-400 mt-1">
+                  Season {lastSessionItem.season || 1}, Episode {lastSessionItem.episode || 1}
+                </p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">
+                  Last active: {new Date(lastSessionItem.watchedAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  })}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => navigate(`/cartoon/${lastSessionItem.cartoonId || lastSessionItem.id}`)}
+              className="relative z-10 mt-6 md:mt-0 gradient-btn text-white text-sm font-semibold px-6 py-3 rounded-xl flex items-center gap-2 active:scale-95 transition-all shadow-lg hover:shadow-pink-500/10 cursor-pointer border-none"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                <path d="M8 5V19L19 12L8 5Z" />
+              </svg>
+              Resume Episode
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

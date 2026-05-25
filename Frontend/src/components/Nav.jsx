@@ -86,6 +86,8 @@ const Nav = () => {
           <img
             src="/assets/Pi7_Tool_movie recommendation logo.png"
             alt="Logo"
+            width={50}
+            height={50}
             className="h-10 md:h-13 cursor-pointer select-none"
           />
         </Link>
@@ -100,7 +102,7 @@ const Nav = () => {
           </div>
           
           {/* Search Icon */}
-          <Link to="/search" className="hover:text-yellow-400 transition-colors duration-200 flex items-center">
+          <Link to="/search" aria-label="Search Movies and Shows" className="hover:text-yellow-400 transition-colors duration-200 flex items-center">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -117,11 +119,15 @@ const Nav = () => {
               <div className="relative flex items-center" ref={dropdownRef}>
                 <button
                   onClick={() => setDropdownOpen(!dropdownOpen)}
+                  aria-label="User Account Menu"
+                  aria-expanded={dropdownOpen}
                   className="flex items-center gap-1.5 focus:outline-none cursor-pointer group"
                 >
                   <img
                     src={user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`}
                     alt={user.name}
+                    width={32}
+                    height={32}
                     className="w-7 h-7 md:w-8 h-8 rounded-lg object-cover border border-white/20 group-hover:border-yellow-400 transition"
                   />
                   <span className="hidden md:block text-xs font-semibold max-w-[80px] truncate text-gray-200 group-hover:text-white">{user.name}</span>

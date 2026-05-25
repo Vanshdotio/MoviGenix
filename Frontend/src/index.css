@@ -5,14 +5,17 @@
 @font-face {
     font-family:"Inter";
     src: url('/assets/Inter_18pt-Regular.ttf');
+    font-display: swap;
 }
 @font-face {
     font-family: "ROSSTEN";  
     src: url('/assets/fonts/ROSSTEN.ttf');
+    font-display: swap;
 }
 @font-face {
     font-family: "Abuget";
     src: url('/assets/fonts/Abuget.woff2') format('woff2');
+    font-display: swap;
 }
 .search{
     mix-blend-mode: difference;

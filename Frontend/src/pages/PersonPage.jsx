@@ -124,6 +124,8 @@ const PersonPage = () => {
             <img
               src={profileUrl}
               alt={person.name}
+              width={280}
+              height={420}
               className="w-full h-full object-cover"
             />
           </div>
@@ -222,6 +224,8 @@ const PersonPage = () => {
                         <img
                           src={`https://image.tmdb.org/t/p/w300${img.file_path}`}
                           alt={`${person.name} photo ${i}`}
+                          width={117}
+                          height={176}
                           className="w-full h-full object-cover"
                           loading="lazy"
                         />
@@ -264,6 +268,8 @@ const PersonPage = () => {
                             <img
                               src={poster}
                               alt={title}
+                              width={144}
+                              height={216}
                               className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                               loading="lazy"
                             />

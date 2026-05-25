@@ -58,8 +58,8 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
           const title = item.title || item.name || "Untitled";
           const rating = item.vote_average ? item.vote_average.toFixed(1) : "N/A";
           const backdropUrl = item.backdrop_path
-            ? `https://image.tmdb.org/t/p/original${item.backdrop_path}`
-            : `https://image.tmdb.org/t/p/original${item.poster_path}`;
+            ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}`
+            : `https://image.tmdb.org/t/p/w780${item.poster_path}`;
 
           return (
             <SwiperSlide key={item.id}>
@@ -70,6 +70,9 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                   src={backdropUrl}
                   alt={title}
                   loading="eager"
+                  fetchPriority="high"
+                  width={1920}
+                  height={1080}
                 />
 
                 {/* Dark Vignette Overlay */}
@@ -100,8 +103,10 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                   {item.logoPath ? (
                     <img
                       className="h-16 md:h-24 mb-4 object-contain"
-                      src={`https://image.tmdb.org/t/p/original${item.logoPath}`}
+                      src={`https://image.tmdb.org/t/p/w500${item.logoPath}`}
                       alt={title}
+                      width={240}
+                      height={96}
                     />
                   ) : (
                     <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight font-[Inter] leading-tight mb-4 drop-shadow-md">
@@ -178,8 +183,10 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                   {item.logoPath ? (
                     <img
                       className="h-12 mb-3 object-contain"
-                      src={`https://image.tmdb.org/t/p/original${item.logoPath}`}
+                      src={`https://image.tmdb.org/t/p/w500${item.logoPath}`}
                       alt={title}
+                      width={120}
+                      height={48}
                     />
                   ) : (
                     <h1 className="text-2xl font-bold tracking-tight font-[Inter] leading-tight mb-3 drop-shadow-lg">

@@ -47,8 +47,22 @@ const setCachedTMDB = (key, data, ttl = DEFAULT_TTL) => {
  * @param {function} fetchFn The original Axios fetch function
  * @param {number} ttl Time to live in milliseconds (default: 10 minutes)
  */
-const fetchWithCacheAndDedupe = async (url, options = {}, fetchFn, ttl = DEFAULT_TTL) => {
+const fetchWithCacheAndDedupe = async (url, options = {}, fetchFn, ttl) => {
   const key = getCacheKey(url, options);
+
+  // Resolve cache TTL dynamically based on TMDB endpoint patterns
+  let resolvedTtl = ttl;
+  if (!resolvedTtl) {
+    if (url.includes("/trending")) {
+      resolvedTtl = 30 * 60 * 1000; // 30 minutes
+    } else if (url.includes("/popular") || url.includes("/discover")) {
+      resolvedTtl = 60 * 60 * 1000; // 1 hour
+    } else if (url.includes("/genre/")) {
+      resolvedTtl = 24 * 60 * 60 * 1000; // 24 hours
+    } else {
+      resolvedTtl = DEFAULT_TTL; // 10 minutes default
+    }
+  }
 
   // 1. Check in-memory cache first
   const cachedData = getCachedTMDB(key);
@@ -68,7 +82,7 @@ const fetchWithCacheAndDedupe = async (url, options = {}, fetchFn, ttl = DEFAULT
       const response = await fetchFn(url, options);
       // Save data to cache on success
       if (response && response.data) {
-        setCachedTMDB(key, response.data, ttl);
+        setCachedTMDB(key, response.data, resolvedTtl);
         return response.data;
       }
       return null;

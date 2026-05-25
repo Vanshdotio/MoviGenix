@@ -71,6 +71,8 @@ const MovieCard = ({ movie, type = "movie" }) => {
           srcSet={srcSet}
           sizes="180px"
           alt={title}
+          width={180}
+          height={270}
           loading="lazy"
           className="w-full h-full object-cover 
                      md:group-hover:scale-105 
@@ -116,6 +118,7 @@ const MovieCard = ({ movie, type = "movie" }) => {
               onClick={handlePlayClick}
               className="flex-1 bg-yellow-400 hover:bg-yellow-300 text-black py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer border-none"
               title="Quick Play"
+              aria-label={`Play ${title}`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
                 <path d="M8 5v14l11-7z" />
@@ -130,6 +133,7 @@ const MovieCard = ({ movie, type = "movie" }) => {
                   : "bg-white/10 border-white/20 text-white hover:bg-white/20"
               }`}
               title={isInWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
+              aria-label={isInWatchlist ? `Remove ${title} from Watchlist` : `Add ${title} to Watchlist`}
             >
               {isInWatchlist ? (
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">

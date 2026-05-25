@@ -11,12 +11,13 @@ const cacheMiddleware = (ttlSeconds = 300) => {
       return next();
     }
 
-    // Partition cache key by restricted/unrestricted status
+    // Partition cache key by restricted/unrestricted status and user identity
     const shouldFilter = req.user 
       ? (!req.user.isAdult || req.user.safeMode || req.user.hideMature) 
       : true; // default restricted for guests
     const prefix = shouldFilter ? "restricted" : "unrestricted";
-    const key = `${prefix}:${req.originalUrl || req.url}`;
+    const userSuffix = req.user ? `user:${req.user._id || req.user.id}` : "guest";
+    const key = `${prefix}:${userSuffix}:${req.originalUrl || req.url}`;
     const cached = cache.get(key);
 
     if (cached) {

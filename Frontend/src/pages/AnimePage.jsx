@@ -111,7 +111,7 @@ const AnimePage = () => {
       <HeroSlider items={trendingAnime.length > 0 ? trendingAnime : topRatedAnime} type="anime" />
 
       {/* Standard Landing View with Anime Sections */}
-      <div className="space-y-2 mt-4">
+      <div className="relative z-20 -mt-16 md:-mt-24 space-y-2">
         {/* 1. Continue Watching (Anime only) */}
         {user && continueWatching.length > 0 && (
           <MediaSlider title="Continue Watching" items={continueWatching} type="anime" />
@@ -147,8 +147,6 @@ const AnimePage = () => {
         {/* 11. Subbed Anime */}
         <MediaSlider title="Subbed Anime" items={subbed} type="anime" viewMoreLink="/anime/subbed" />
 
-        {/* 12. Hidden Gems */}
-        <MediaSlider title="Hidden Gems" items={hiddenGems} type="anime" viewMoreLink="/anime/hidden-gems" />
 
         {/* 13. Editor's Picks */}
         <MediaSlider title="Editor's Picks" items={editorsPicks} type="anime" viewMoreLink="/anime/editors-picks" />

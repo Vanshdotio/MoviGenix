@@ -159,8 +159,6 @@ const MoviesPage = () => {
         {/* 6. Award Winning Movies */}
         <MediaSlider title="Award Winning Movies" items={awardWinning} type="movie" viewMoreLink="/movies/award-winning" />
 
-        {/* 7. Hidden Gems */}
-        <MediaSlider title="Hidden Gems" items={hiddenGems} type="movie" viewMoreLink="/movies/hidden-gems" />
 
         {/* 8. Recommended Movies */}
         <MediaSlider

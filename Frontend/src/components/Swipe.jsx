@@ -74,6 +74,9 @@ const Swipe = () => {
               className="absolute inset-0 w-full h-full object-cover"
               src={`https://image.tmdb.org/t/p/w780${movie.backdrop_path}`}
               alt={movie.title}
+              width={1280}
+              height={720}
+              loading="lazy"
             />
 
             {/* VIDEO */}
@@ -97,8 +100,11 @@ const Swipe = () => {
               {movie.logoPath ? (
                 <img
                   className="h-24 mb-4 object-contain"
-                  src={`https://image.tmdb.org/t/p/original${movie.logoPath}`}
+                  src={`https://image.tmdb.org/t/p/w500${movie.logoPath}`}
                   alt={movie.title}
+                  width={240}
+                  height={96}
+                  loading="lazy"
                 />
               ) : (
                 <h1 className="text-5xl font-bold">{movie.title}</h1>
