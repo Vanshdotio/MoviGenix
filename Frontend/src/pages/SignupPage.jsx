@@ -249,7 +249,7 @@ const SignupPage = () => {
           <button
             type="submit"
             disabled={loading}
-            className="gradient-btn w-full py-3.5 rounded-xl text-white font-semibold text-sm cursor-pointer shadow-lg hover:shadow-blue-500/20 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
+            className="gradient-btn w-full max-w-[360px] h-10 mx-auto rounded-xl text-white font-semibold text-sm cursor-pointer shadow-lg hover:shadow-blue-500/20 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? (
               <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -269,7 +269,7 @@ const SignupPage = () => {
 
         {/* Google Authentication Component */}
         <div className="flex justify-center w-full">
-          <div className="flex justify-center w-full [&>div]:!flex [&>div]:!justify-center">
+          <div className="w-full max-w-[360px] h-10 rounded-xl overflow-hidden flex justify-center items-center">
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
               onError={() => setErrorMsg("Google Sign-Up failed. Please try again.")}
