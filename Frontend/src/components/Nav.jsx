@@ -90,7 +90,7 @@ const Nav = () => {
       >
         <Link to="/">
           <img
-            src="/assets/Pi7_Tool_movie recommendation logo.png"
+            src="/assets/movigenix-m-logo.png"
             alt="Logo"
             width={50}
             height={50}

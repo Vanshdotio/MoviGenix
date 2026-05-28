@@ -124,11 +124,9 @@ const SignupPage = () => {
         <div className="text-center mb-6">
           <Link to="/">
             <img
-              src="/assets/Pi7_Tool_movie recommendation logo.png"
+              src="/assets/movigenix-m-logo.png"
               alt="Logo"
-              width={180}
-              height={48}
-              className="h-12 mx-auto mb-4 cursor-pointer"
+              className="h-12 w-12 mx-auto mb-4 cursor-pointer object-contain"
             />
           </Link>
           <h2 className="text-2xl font-bold font-['ROSSTEN'] tracking-wider text-white">

@@ -60,7 +60,7 @@ const AdminLayout = () => {
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
             <img
-              src="/assets/Pi7_Tool_movie recommendation logo.png"
+              src="/assets/movigenix-m-logo.png"
               alt="Logo"
               className="h-10 cursor-pointer select-none"
               onClick={() => navigate("/")}
