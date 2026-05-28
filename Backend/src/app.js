@@ -4,6 +4,10 @@ const cookieParser = require('cookie-parser');
 const compression = require('compression');
 const movieRoutes = require('./routes/movie.routes');
 const authRoutes = require('./routes/auth.routes');
+const adminRoutes = require('./routes/admin.routes');
+const telemetryRoutes = require('./routes/telemetry.routes');
+const adsRoutes = require('./routes/ads.routes');
+const path = require('path');
 const performanceMiddleware = require('./middlewares/performance');
 const errorMiddleware = require('./middlewares/error');
 
@@ -50,6 +54,10 @@ app.get("/ping", (req, res) => {
 
 app.use('/api/movies', movieRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/telemetry', telemetryRoutes);
+app.use('/api/ads', adsRoutes);
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
 // Global Error Handler
 app.use(errorMiddleware);

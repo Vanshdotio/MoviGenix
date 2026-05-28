@@ -168,6 +168,27 @@ const UserSchema = new mongoose.Schema(
       unique: true,
       sparse: true, // Allows multiple null values for normal users
     },
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+    },
+    isPremium: {
+      type: Boolean,
+      default: false,
+    },
+    device: {
+      type: String,
+      default: "Unknown",
+    },
+    os: {
+      type: String,
+      default: "Unknown",
+    },
+    country: {
+      type: String,
+      default: "Unknown",
+    },
     avatar: {
       type: String,
       default: "", // Can be custom URL or set dynamically during login/signup
@@ -252,6 +273,14 @@ const UserSchema = new mongoose.Schema(
       autoSelectDub: {
         type: Boolean,
         default: false,
+      },
+      volume: {
+        type: Number,
+        default: 0.9,
+      },
+      audioMode: {
+        type: String,
+        default: "Voice Boost",
       },
     },
   },

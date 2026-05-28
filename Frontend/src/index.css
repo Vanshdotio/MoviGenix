@@ -46,4 +46,36 @@
   100% {
     transform: translateX(100%);
   }
+}
+
+/* Custom Global Premium Scrollbar Styles (Removes thick white track) */
+::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-radius: 9999px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Firefox Scrollbar overrides */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+/* Force dark-mode scrollbars & backgrounds natively */
+html, body {
+  color-scheme: dark;
 }

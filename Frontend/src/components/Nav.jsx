@@ -48,6 +48,12 @@ const Nav = () => {
   ];
 
   if (user) {
+    if (user.role === "admin") {
+      menuItems.push({
+        label: "Admin Dashboard",
+        link: "/admin"
+      });
+    }
     menuItems.push({
       label: "My Profile",
       link: "/profile"
@@ -99,6 +105,12 @@ const Nav = () => {
             <Link to="/cartoon" className="hover:text-yellow-400 transition-colors duration-200">Cartoon</Link>
             <Link to="/tv" className="hover:text-yellow-400 transition-colors duration-200">TV Shows</Link>
             <Link to="/anime" className="hover:text-yellow-400 transition-colors duration-200">Anime</Link>
+            {user && user.role === "admin" && (
+              <Link to="/admin" className="text-yellow-400 hover:text-white font-bold transition-colors duration-200 flex items-center gap-1">
+                <i className="ri-shield-user-line text-sm"></i>
+                <span>Dashboard</span>
+              </Link>
+            )}
           </div>
           
           {/* Search Icon */}
@@ -147,6 +159,16 @@ const Nav = () => {
                       <p className="text-xs font-bold text-white truncate">{user.name}</p>
                       <p className="text-[10px] text-zinc-500 truncate">{user.email}</p>
                     </div>
+                    {user && user.role === "admin" && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs text-yellow-400 hover:text-white hover:bg-white/5 transition font-semibold"
+                      >
+                        <i className="ri-shield-user-line text-sm text-yellow-400/80"></i>
+                        Admin Dashboard
+                      </Link>
+                    )}
                     <Link
                       to="/profile"
                       onClick={() => setDropdownOpen(false)}

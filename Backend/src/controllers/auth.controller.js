@@ -682,6 +682,10 @@ const updateProfile = async (req, res) => {
         user.preferences.subtitleLanguage = preferences.subtitleLanguage;
       if (typeof preferences.autoSelectDub === "boolean")
         user.preferences.autoSelectDub = preferences.autoSelectDub;
+      if (preferences.volume !== undefined)
+        user.preferences.volume = preferences.volume;
+      if (preferences.audioMode !== undefined)
+        user.preferences.audioMode = preferences.audioMode;
     }
 
     if (dob) {

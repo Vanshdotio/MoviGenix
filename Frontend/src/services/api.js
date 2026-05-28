@@ -451,4 +451,139 @@ export const removeContinueWatchingApi = async (media) => {
   return response.data;
 };
 
+export const adminClient = axios.create({
+  baseURL: `${BACKEND_URL}/api/admin`,
+  headers: {
+    "Content-Type": "application/json",
+  },
+  withCredentials: true,
+});
+
+adminClient.interceptors.request.use(attachToken);
+
+/**
+ * ==========================================
+ * ADMIN DASHBOARD METHODS
+ * ==========================================
+ */
+
+export const getDashboardStatsApi = async () => {
+  const response = await adminClient.get("/dashboard-stats");
+  return response.data;
+};
+
+export const getUsersListApi = async (params) => {
+  const response = await adminClient.get("/users-list", { params });
+  return response.data;
+};
+
+export const getAnalyticsGrowthApi = async (params) => {
+  const response = await adminClient.get("/analytics-growth", { params });
+  return response.data;
+};
+
+export const getContentInsightsApi = async () => {
+  const response = await adminClient.get("/content-insights");
+  return response.data;
+};
+
+export const getPlayerWatchApi = async () => {
+  const response = await adminClient.get("/player-watch");
+  return response.data;
+};
+
+export const getLiveActivityApi = async () => {
+  const response = await adminClient.get("/live-activity");
+  return response.data;
+};
+
+export const toggleTrafficSimulatorApi = async (active) => {
+  const response = await adminClient.post("/simulate-traffic", { active });
+  return response.data;
+};
+
+export const resetAnalyticsDataApi = async () => {
+  const response = await adminClient.post("/reset-analytics");
+  return response.data;
+};
+
+export const promoteUserToAdminApi = async (email) => {
+  const response = await adminClient.post("/promote", { email });
+  return response.data;
+};
+
+export const toggleUserPremiumApi = async (userId) => {
+  const response = await adminClient.post("/toggle-premium", { userId });
+  return response.data;
+};
+
+// Ads Client & API Calls
+export const adsClient = axios.create({
+  baseURL: `${BACKEND_URL}/api/ads`,
+  headers: {
+    "Content-Type": "application/json",
+  },
+  withCredentials: true,
+});
+
+adsClient.interceptors.request.use(attachToken);
+
+export const getAdsListApi = async () => {
+  const response = await adsClient.get("/admin/ads");
+  return response.data;
+};
+
+export const createAdApi = async (formData) => {
+  const response = await adsClient.post("/admin/ads", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
+export const updateAdApi = async (id, formData) => {
+  const response = await adsClient.put(`/admin/ads/${id}`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
+export const deleteAdApi = async (id) => {
+  const response = await adsClient.delete(`/admin/ads/${id}`);
+  return response.data;
+};
+
+export const getAdStatsApi = async () => {
+  const response = await adsClient.get("/admin/ads/stats");
+  return response.data;
+};
+
+export const getActiveAdsApi = async () => {
+  const response = await adsClient.get("/player/active");
+  return response.data;
+};
+
+export const trackAdViewApi = async (id) => {
+  const response = await adsClient.post(`/player/${id}/view`);
+  return response.data;
+};
+
+export const trackAdClickApi = async (id) => {
+  const response = await adsClient.post(`/player/${id}/click`);
+  return response.data;
+};
+
+export const trackAdCompleteApi = async (id, watchedDuration) => {
+  const response = await adsClient.post(`/player/${id}/complete`, { watchedDuration });
+  return response.data;
+};
+
+export const trackAdSkipApi = async (id, watchedDuration) => {
+  const response = await adsClient.post(`/player/${id}/skip`, { watchedDuration });
+  return response.data;
+};
+
 export default apiClient;

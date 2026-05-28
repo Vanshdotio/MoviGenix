@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { searchMedia } from "../services/api";
+import { trackSearch } from "../services/telemetry";
 
 const SearchOverlay = () => {
   const [text, setText] = useState("");
@@ -20,10 +21,13 @@ const SearchOverlay = () => {
       try {
         const data = await searchMedia(searchType, text);
         // data.results is returned by the paginated search endpoint
-        setResults(data.results || []);
+        const searchResults = data.results || [];
+        setResults(searchResults);
+        trackSearch(text, searchResults.length);
       } catch (err) {
         console.error("Error searching media:", err);
         setResults([]);
+        trackSearch(text, 0);
       } finally {
         setLoading(false);
       }

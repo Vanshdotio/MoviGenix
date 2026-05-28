@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const dns = require("dns");
 const axios = require("axios");
+const { seedAnalyticsData } = require("./seedAnalytics");
 
 // Some environments (e.g. certain corporate networks or custom DNS setups) can
 // block or mis-handle SRV lookups used by mongodb+srv URIs. We set a reliable
@@ -255,6 +256,7 @@ const connectToDB = async () => {
         await mongoose.connect(process.env.MONGO_URI);
         console.log("DB connected Succesfully.");
         await migrateDatabase();
+        await seedAnalyticsData();
     }
     catch(error){
         console.error(error);

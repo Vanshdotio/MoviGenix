@@ -1,6 +1,132 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { getSecurePlayerUrl } from "../services/api";
+import {
+  getSecurePlayerUrl,
+  getActiveAdsApi,
+  trackAdViewApi,
+  trackAdClickApi,
+  trackAdCompleteApi,
+  trackAdSkipApi,
+} from "../services/api";
 import AudioSelector from "./AudioSelector";
+import { trackPlayerEvent, trackWatchProgress } from "../services/telemetry";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+import { useAuth } from "../context/AuthContext";
+
+// Web Audio API Audio Enhancer Class
+class AudioEnhancer {
+  constructor(mediaElement) {
+    if (!mediaElement) return;
+    try {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.source = this.audioContext.createMediaElementSource(mediaElement);
+
+      this.gainNode = this.audioContext.createGain();
+      this.compressor = this.audioContext.createDynamicsCompressor();
+
+      // Equalizer nodes
+      this.lowFilter = this.audioContext.createBiquadFilter();
+      this.lowFilter.type = "lowshelf";
+      this.lowFilter.frequency.value = 250;
+
+      this.midFilter = this.audioContext.createBiquadFilter();
+      this.midFilter.type = "peaking";
+      this.midFilter.frequency.value = 1500;
+      this.midFilter.Q.value = 1.0;
+
+      this.highFilter = this.audioContext.createBiquadFilter();
+      this.highFilter.type = "highshelf";
+      this.highFilter.frequency.value = 6000;
+
+      // Connect: Source -> LowFilter -> MidFilter -> HighFilter -> Compressor -> Gain -> Destination
+      this.source.connect(this.lowFilter);
+      this.lowFilter.connect(this.midFilter);
+      this.midFilter.connect(this.highFilter);
+      this.highFilter.connect(this.compressor);
+      this.compressor.connect(this.gainNode);
+      this.gainNode.connect(this.audioContext.destination);
+
+      // Default mode
+      this.setMode("Voice Boost");
+    } catch (err) {
+      console.warn("Web Audio API not fully supported or blocked for this element:", err);
+    }
+  }
+
+  setVolume(volume) {
+    if (this.gainNode && this.audioContext) {
+      this.gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+    }
+  }
+
+  setMode(mode) {
+    if (!this.audioContext) return;
+    const now = this.audioContext.currentTime;
+
+    // Reset EQ gains
+    this.lowFilter.gain.setValueAtTime(0, now);
+    this.midFilter.gain.setValueAtTime(0, now);
+    this.highFilter.gain.setValueAtTime(0, now);
+
+    // Default Compressor settings (Normalize audio)
+    this.compressor.threshold.setValueAtTime(-24, now);
+    this.compressor.knee.setValueAtTime(30, now);
+    this.compressor.ratio.setValueAtTime(12, now);
+    this.compressor.attack.setValueAtTime(0.003, now);
+    this.compressor.release.setValueAtTime(0.25, now);
+
+    switch (mode) {
+      case "Standard":
+        // Bypass/Flat response
+        this.compressor.threshold.setValueAtTime(-10, now);
+        this.compressor.ratio.setValueAtTime(1, now);
+        break;
+
+      case "Voice Boost":
+        // Enhance dialogue / speech clarity
+        this.lowFilter.gain.setValueAtTime(-4, now); // Reduce background rumble
+        this.midFilter.gain.setValueAtTime(6, now);  // Boost speech mid range (1.5kHz)
+        this.highFilter.gain.setValueAtTime(2, now); // Add clarity to consonants
+        this.compressor.threshold.setValueAtTime(-20, now);
+        this.compressor.ratio.setValueAtTime(4, now);
+        break;
+
+      case "Cinema":
+        // Rich bass and sparkling highs for action/movie feel
+        this.lowFilter.gain.setValueAtTime(5, now);
+        this.midFilter.gain.setValueAtTime(2, now);
+        this.highFilter.gain.setValueAtTime(4, now);
+        this.compressor.threshold.setValueAtTime(-15, now);
+        this.compressor.ratio.setValueAtTime(3, now);
+        break;
+
+      case "Loud":
+        // Heavy compression to maximize average loudness, slight mid-high boost
+        this.midFilter.gain.setValueAtTime(3, now);
+        this.highFilter.gain.setValueAtTime(3, now);
+        this.compressor.threshold.setValueAtTime(-36, now);
+        this.compressor.ratio.setValueAtTime(8, now);
+        break;
+
+      case "Night Mode":
+        // Compress heavily, cut deep bass (wall shaking), boost voice range slightly
+        this.lowFilter.gain.setValueAtTime(-12, now); // Remove bass
+        this.midFilter.gain.setValueAtTime(4, now);   // Clear voices
+        this.highFilter.gain.setValueAtTime(-2, now);  // Smooth high frequencies
+        this.compressor.threshold.setValueAtTime(-30, now);
+        this.compressor.ratio.setValueAtTime(12, now);
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  close() {
+    if (this.audioContext && this.audioContext.state !== "closed") {
+      this.audioContext.close().catch(() => {});
+    }
+  }
+}
 
 const VideoPlayer = ({
   type,
@@ -21,11 +147,47 @@ const VideoPlayer = ({
   episodes = [],
   onPlayEpisode,
 }) => {
+  const { user, updateProfile } = useAuth();
+
   const [playerUrl, setPlayerUrl] = useState("");
+  const [canLoadPlayer, setCanLoadPlayer] = useState(false);
+  const [adsList, setAdsList] = useState([]);
+  const [currentAd, setCurrentAd] = useState(null);
+  const [adPlaying, setAdPlaying] = useState(false);
+  const [adDuration, setAdDuration] = useState(0);
+  const [adCurrentTime, setAdCurrentTime] = useState(0);
+  const [skipTimer, setSkipTimer] = useState(0);
+  const [firedMidRolls, setFiredMidRolls] = useState([]);
+  const [postRollPlayed, setPostRollPlayed] = useState(false);
+  const adVideoRef = useRef(null);
+
+  const [adSkippable, setAdSkippable] = useState(false);
+  const [preRollCount, setPreRollCount] = useState(0);
+  const [midRollCount, setMidRollCount] = useState(0);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedAudio, setSelectedAudio] = useState(initialAudio || "original");
+
+  // Load initial settings
+  const getInitialVolume = () => {
+    const saved = localStorage.getItem("movigenix_volume");
+    if (saved !== null) return parseFloat(saved);
+    if (user?.preferences?.volume !== undefined) return user.preferences.volume;
+    return 0.9; // Default 90% volume
+  };
+
+  const getInitialAudioMode = () => {
+    const saved = localStorage.getItem("movigenix_audioMode");
+    if (saved !== null) return saved;
+    if (user?.preferences?.audioMode !== undefined) return user.preferences.audioMode;
+    return "Voice Boost"; // Default "Voice Boost"
+  };
+
+  // Settings State
+  const [volume, setVolumeState] = useState(getInitialVolume());
+  const [audioMode, setAudioModeState] = useState(getInitialAudioMode());
 
   // Custom Player Overlay States
   const [isPlaying, setIsPlaying] = useState(true);
@@ -36,16 +198,22 @@ const VideoPlayer = ({
   const [isPortraitMobile, setIsPortraitMobile] = useState(false);
   const [showEpisodesMenu, setShowEpisodesMenu] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState(null);
-  const [selectedServer, setSelectedServer] = useState("vidking");
+  const [selectedServer, setSelectedServer] = useState(() => {
+    return localStorage.getItem("movigenix_server") || "vidking";
+  });
   const [showServerMenu, setShowServerMenu] = useState(false);
 
   const playerContainerRef = useRef(null);
   const iframeRef = useRef(null);
+  const audioRef = useRef(null);
+  const audioEnhancerRef = useRef(null);
   const currentProgressRef = useRef(initialProgress);
   const controlsTimeoutRef = useRef(null);
   const touchStartY = useRef(null);
   const serverMenuRef = useRef(null);
   const episodesMenuRef = useRef(null);
+  const lastProgressSentTimeRef = useRef(0);
+  const syncSettingsTimeoutRef = useRef(null);
 
   // Close menus on outside click
   useEffect(() => {
@@ -167,6 +335,83 @@ const VideoPlayer = ({
     };
   }, []);
 
+  // Volume scaling function based on active audioMode
+  const getScaledVolume = useCallback((volVal, modeVal) => {
+    let multiplier = 1.0;
+    switch (modeVal) {
+      case "Standard":
+        multiplier = 1.0;
+        break;
+      case "Voice Boost":
+        multiplier = 1.15; // Boost dialogue level slightly
+        break;
+      case "Cinema":
+        multiplier = 1.25; // Boost rich effects/dialogue
+        break;
+      case "Loud":
+        multiplier = 1.5;  // Hard boost
+        break;
+      case "Night Mode":
+        multiplier = 0.7;  // Soften level
+        break;
+      default:
+        break;
+    }
+    return Math.min(1.0, volVal * multiplier);
+  }, []);
+
+  // Settings persistence handler (LocalStorage + DB updateProfile)
+  const saveSettings = useCallback((newVol, newMode) => {
+    localStorage.setItem("movigenix_volume", newVol);
+    localStorage.setItem("movigenix_audioMode", newMode);
+
+    if (syncSettingsTimeoutRef.current) {
+      clearTimeout(syncSettingsTimeoutRef.current);
+    }
+
+    syncSettingsTimeoutRef.current = setTimeout(() => {
+      if (user) {
+        updateProfile({
+          preferences: {
+            volume: newVol,
+            audioMode: newMode
+          }
+        }).catch((err) => console.error("Failed to sync player preferences:", err));
+      }
+    }, 1000);
+  }, [user, updateProfile]);
+
+  // Audio Enhancer effects controller
+  useEffect(() => {
+    if (audioEnhancerRef.current) {
+      audioEnhancerRef.current.setMode(audioMode);
+      audioEnhancerRef.current.setVolume(getScaledVolume(volume, audioMode));
+    }
+    
+    // Also notify iframe player about volume updates
+    if (playerUrl && !loading) {
+      const scaledVol = getScaledVolume(volume, audioMode);
+      sendIframeCommand("volume", null, scaledVol);
+    }
+  }, [volume, audioMode, playerUrl, loading, getScaledVolume]);
+
+  // Initialize Web Audio API Audio Enhancer on mounting
+  useEffect(() => {
+    if (audioRef.current) {
+      audioEnhancerRef.current = new AudioEnhancer(audioRef.current);
+      audioEnhancerRef.current.setMode(audioMode);
+      audioEnhancerRef.current.setVolume(getScaledVolume(volume, audioMode));
+    }
+    return () => {
+      if (audioEnhancerRef.current) {
+        audioEnhancerRef.current.close();
+      }
+      if (syncSettingsTimeoutRef.current) {
+        clearTimeout(syncSettingsTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // PostMessage Commands Sender Helper
   const sendIframeCommand = (event, key = null, val = null) => {
     if (!iframeRef.current || !iframeRef.current.contentWindow) return;
@@ -191,6 +436,14 @@ const VideoPlayer = ({
         targetWindow.postMessage(JSON.stringify({ event }), "*");
         targetWindow.postMessage({ event }, "*");
         targetWindow.postMessage({ method: event }, "*");
+      } else if (event === "volume" && typeof val === "number") {
+        // Send volume configurations in all expected formats
+        targetWindow.postMessage(JSON.stringify({ event: "command", func: "setVolume", params: [val * 100] }), "*");
+        targetWindow.postMessage(JSON.stringify({ event: "command", func: "setVolume", params: [val] }), "*");
+        targetWindow.postMessage(JSON.stringify({ event: "volume", value: val }), "*");
+        targetWindow.postMessage({ event: "volume", value: val }, "*");
+        targetWindow.postMessage({ method: "setVolume", value: val }, "*");
+        targetWindow.postMessage({ method: "setVolume", value: val * 100 }, "*");
       }
     } catch (err) {
       console.warn("Failed to dispatch command to player iframe:", err);
@@ -254,6 +507,7 @@ const VideoPlayer = ({
         switch (eventType) {
           case "play":
             setIsPlaying(true);
+            trackPlayerEvent(id, type, title, "play");
             break;
           case "pause":
             setIsPlaying(false);
@@ -264,6 +518,12 @@ const VideoPlayer = ({
               setCurrentTime(currentProgress);
               if (dur) setDuration(dur);
               onProgressUpdate(currentProgress, dur, "pause");
+              
+              // Track event and save progress immediately on pause
+              trackPlayerEvent(id, type, title, "pause");
+              if (dur > 0) {
+                trackWatchProgress(id, type, title, posterPath, currentProgress, dur);
+              }
             }
             break;
           case "seeked":
@@ -274,6 +534,8 @@ const VideoPlayer = ({
               setCurrentTime(currentProgress);
               if (dur) setDuration(dur);
               onProgressUpdate(currentProgress, dur, "seeked");
+              
+              trackPlayerEvent(id, type, title, "seek", { seekTo: currentProgress });
             }
             break;
           case "timeupdate":
@@ -283,13 +545,32 @@ const VideoPlayer = ({
             setCurrentTime(currentProgress);
             if (dur) setDuration(dur);
             onProgressUpdate(currentProgress, dur, "timeupdate");
-            break;
-          case "ended":
-            onProgressUpdate(data.duration || 0, data.duration || 0, "ended");
-            if (nextEpisodeAvailable && onNextEpisode) {
-              setCountdownSeconds(5);
+            checkMidRollAds(currentProgress);
+            
+            // Throttle telemetry progress reports to once every 15 seconds
+            if (dur > 0 && Date.now() - lastProgressSentTimeRef.current > 15000) {
+              trackWatchProgress(id, type, title, posterPath, currentProgress, dur);
+              lastProgressSentTimeRef.current = Date.now();
             }
             break;
+          case "ended":
+            const finalDur = data.duration || duration || 0;
+            onProgressUpdate(finalDur, finalDur, "ended");
+            
+            trackPlayerEvent(id, type, title, "complete");
+            if (finalDur > 0) {
+              trackWatchProgress(id, type, title, posterPath, finalDur, finalDur);
+            }
+            
+             // Check for Post-roll ad!
+             const postRollAd = type === "movie" ? adsList.find(a => a.placement === "post-roll") : null;
+             if (postRollAd && !user?.isPremium && !postRollPlayed) {
+               setPostRollPlayed(true);
+               playAd(postRollAd);
+             } else if (nextEpisodeAvailable && onNextEpisode) {
+               setCountdownSeconds(5);
+             }
+             break;
           default:
             break;
         }
@@ -302,7 +583,7 @@ const VideoPlayer = ({
     return () => {
       window.removeEventListener("message", handlePlayerMessage);
     };
-  }, [onProgressUpdate, nextEpisodeAvailable, onNextEpisode]);
+  }, [onProgressUpdate, nextEpisodeAvailable, onNextEpisode, id, type, title, posterPath, duration]);
 
   // Custom 5-second countdown timer for next episode
   useEffect(() => {
@@ -320,6 +601,10 @@ const VideoPlayer = ({
 
   const handleIframeLoad = () => {
     setLoading(false);
+    
+    // Set initial volume immediately on load
+    const scaledVol = getScaledVolume(volume, audioMode);
+    sendIframeCommand("volume", null, scaledVol);
   };
 
   const handleAudioChange = useCallback((newAudioLang) => {
@@ -328,15 +613,18 @@ const VideoPlayer = ({
     if (onAudioChange) {
       onAudioChange(newAudioLang);
     }
+    trackPlayerEvent(id, type, title, "audio_change", { fromAudio: selectedAudio, toAudio: newAudioLang });
     fetchPlayerUrl(newAudioLang, currentProgressRef.current, selectedServer);
-  }, [selectedAudio, fetchPlayerUrl, onAudioChange, selectedServer]);
+  }, [selectedAudio, fetchPlayerUrl, onAudioChange, selectedServer, id, type, title]);
 
   const handleServerChange = useCallback((newServer) => {
     if (newServer === selectedServer) return;
     setSelectedServer(newServer);
+    localStorage.setItem("movigenix_server", newServer);
     setShowServerMenu(false);
+    trackPlayerEvent(id, type, title, "quality_change", { fromServer: selectedServer, toServer: newServer });
     fetchPlayerUrl(selectedAudio, currentProgressRef.current, newServer);
-  }, [selectedServer, selectedAudio, fetchPlayerUrl]);
+  }, [selectedServer, selectedAudio, fetchPlayerUrl, id, type, title]);
 
   const toggleFullscreen = () => {
     if (!playerContainerRef.current) return;
@@ -394,6 +682,175 @@ const VideoPlayer = ({
       return `${hrs}:${mins < 10 ? "0" : ""}${mins}:${s < 10 ? "0" : ""}${s}`;
     }
     return `${mins}:${s < 10 ? "0" : ""}${s}`;
+  };
+
+  // Reset ad playback and limits when media changes
+  useEffect(() => {
+    setPreRollCount(0);
+    setMidRollCount(0);
+    setFiredMidRolls([]);
+    setPostRollPlayed(false);
+    setCanLoadPlayer(false);
+  }, [id, season, episode]);
+
+  const getMediaUrl = (url) => {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    return `${BACKEND_URL}${url}`;
+  };
+
+  const playAd = (ad) => {
+    setCurrentAd(ad);
+    setAdPlaying(true);
+    setSkipTimer(ad.skipAfter);
+    setAdCurrentTime(0);
+    
+    // Pause movie if already loaded
+    sendIframeCommand("pause");
+    
+    trackAdViewApi(ad._id).catch(err => console.error("Error tracking ad view:", err));
+  };
+
+  // Sync volume with ad video element
+  useEffect(() => {
+    if (adPlaying && adVideoRef.current) {
+      adVideoRef.current.volume = isMuted ? 0 : volume;
+      adVideoRef.current.muted = isMuted;
+    }
+  }, [volume, isMuted, adPlaying]);
+
+  // Skip countdown effect
+  useEffect(() => {
+    if (!adPlaying || !currentAd || skipTimer <= 0) return;
+    const timer = setTimeout(() => {
+      setSkipTimer(prev => prev - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [adPlaying, currentAd, skipTimer]);
+
+  // Fetch active ads on mount / media change
+  useEffect(() => {
+    const fetchAds = async () => {
+      if (user?.isPremium) {
+        setCanLoadPlayer(true);
+        return;
+      }
+      try {
+        const res = await getActiveAdsApi();
+        if (res.success && res.ads && res.ads.length > 0) {
+          setAdsList(res.ads);
+          // Check for pre-roll ad (limit 1)
+          const preRollAd = res.ads.find(a => a.placement === "pre-roll");
+          if (preRollAd && preRollCount < 1) {
+            setPreRollCount(1);
+            playAd(preRollAd);
+          } else {
+            setCanLoadPlayer(true);
+          }
+        } else {
+          setCanLoadPlayer(true);
+        }
+      } catch (err) {
+        console.error("Error loading active ads:", err);
+        setCanLoadPlayer(true);
+      }
+    };
+    fetchAds();
+  }, [id, type, user, season, episode]);
+
+  const handleAdClick = (e) => {
+    e.stopPropagation();
+    if (!currentAd) return;
+    trackAdClickApi(currentAd._id).catch(err => console.error("Error tracking ad click:", err));
+    const dest = currentAd.description && currentAd.description.startsWith("http")
+      ? currentAd.description
+      : "https://www.google.com";
+    window.open(dest, "_blank");
+  };
+
+  const handleAdTimeUpdate = () => {
+    if (adVideoRef.current) {
+      setAdCurrentTime(adVideoRef.current.currentTime);
+    }
+  };
+
+  const handleAdLoadedMetadata = () => {
+    if (adVideoRef.current && currentAd) {
+      const dur = adVideoRef.current.duration;
+      setAdDuration(dur);
+      
+      let isSkippable = false;
+      let delay = 0;
+      
+      if (currentAd.smartSkip) {
+        // Smart Skip: <=15s -> No Skip, >15s -> Skip after delay (default 5s)
+        if (dur > 15) {
+          isSkippable = true;
+          delay = currentAd.skipAfter || 5;
+        } else {
+          isSkippable = false;
+          delay = 0;
+        }
+      } else {
+        // Smart Skip disabled -> respect custom setting
+        isSkippable = currentAd.skipAfter > 0;
+        delay = currentAd.skipAfter;
+      }
+      
+      setAdSkippable(isSkippable);
+      setSkipTimer(delay);
+    }
+  };
+
+  const handleAdEnded = () => {
+    const finishedAd = currentAd;
+    const watchedTime = adVideoRef.current ? Math.round(adVideoRef.current.currentTime) : 0;
+    trackAdCompleteApi(finishedAd._id, watchedTime).catch(err => console.error("Error tracking ad complete:", err));
+    finishAd(finishedAd);
+  };
+
+  const handleSkipAd = (e) => {
+    e.stopPropagation();
+    const skippedAd = currentAd;
+    const watchedTime = adVideoRef.current ? Math.round(adVideoRef.current.currentTime) : 0;
+    trackAdSkipApi(skippedAd._id, watchedTime).catch(err => console.error("Error tracking ad skip:", err));
+    finishAd(skippedAd);
+  };
+
+  const finishAd = (ad) => {
+    setAdPlaying(false);
+    setCurrentAd(null);
+    if (ad.placement === "pre-roll") {
+      setCanLoadPlayer(true);
+    } else if (ad.placement === "mid-roll") {
+      sendIframeCommand("play");
+    } else if (ad.placement === "post-roll") {
+      if (nextEpisodeAvailable && onNextEpisode) {
+        setCountdownSeconds(5);
+      }
+    }
+  };
+
+  const checkMidRollAds = (progressTime) => {
+    if (user?.isPremium || adsList.length === 0 || adPlaying) return;
+    
+    // Limits: only mid-roll for movie, max 2
+    if (type !== "movie") return;
+    if (midRollCount >= 2) return;
+    
+    const midRolls = adsList.filter(ad => ad.placement === "mid-roll");
+    for (const ad of midRolls) {
+      if (
+        progressTime >= ad.midRollTime &&
+        progressTime <= ad.midRollTime + 5 &&
+        !firedMidRolls.includes(ad._id)
+      ) {
+        setFiredMidRolls(prev => [...prev, ad._id]);
+        setMidRollCount(prev => prev + 1);
+        playAd(ad);
+        break;
+      }
+    }
   };
 
   if (error === "restricted") {
@@ -507,7 +964,7 @@ const VideoPlayer = ({
       )}
 
       {/* Main Video Iframe */}
-      {playerUrl && (
+      {playerUrl && canLoadPlayer && (
         <div className="relative w-full h-full">
           <iframe
             ref={iframeRef}
@@ -650,6 +1107,65 @@ const VideoPlayer = ({
             />
           )}
 
+          {/* Audio Mode Selector */}
+          <div className="flex items-center gap-1.5 bg-black/60 border border-white/10 hover:border-white/25 rounded-full px-3.5 py-2 text-xs font-semibold text-white backdrop-blur-xl transition duration-200">
+            <span className="text-zinc-400 select-none">🎧 Mode:</span>
+            <select
+              value={audioMode}
+              onChange={(e) => {
+                const val = e.target.value;
+                setAudioModeState(val);
+                saveSettings(volume, val);
+                if (audioEnhancerRef.current) {
+                  audioEnhancerRef.current.setMode(val);
+                }
+              }}
+              className="bg-transparent border-none text-yellow-400 font-bold outline-none cursor-pointer select-none"
+            >
+              <option value="Standard" className="bg-zinc-950 text-white">Standard</option>
+              <option value="Voice Boost" className="bg-zinc-950 text-yellow-400 font-bold">Voice Boost</option>
+              <option value="Cinema" className="bg-zinc-950 text-white">Cinema</option>
+              <option value="Loud" className="bg-zinc-950 text-white">Loud</option>
+              <option value="Night Mode" className="bg-zinc-950 text-white">Night Mode</option>
+            </select>
+          </div>
+
+          {/* Volume Control Group */}
+          <div className="flex items-center gap-2 bg-black/60 border border-white/10 rounded-full px-3.5 py-2 backdrop-blur-xl text-xs font-semibold text-white">
+            <button
+              onClick={toggleMute}
+              className="text-white hover:text-yellow-400 transition cursor-pointer flex items-center justify-center"
+              title={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted || volume === 0 ? (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-red-500">
+                  <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.21.05-.42.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-yellow-400">
+                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
+                </svg>
+              )}
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={isMuted ? 0 : volume}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                if (isMuted) setIsMuted(false);
+                setVolumeState(val);
+                saveSettings(val, audioMode);
+              }}
+              className="w-16 md:w-20 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-yellow-400 outline-none"
+            />
+            <span className="text-[10px] text-zinc-400 font-bold select-none min-w-[24px] text-right">
+              {Math.round((isMuted ? 0 : volume) * 100)}%
+            </span>
+          </div>
+
           {/* Next Episode Button */}
           {type !== "movie" && nextEpisodeAvailable && onNextEpisode && (
             <button
@@ -700,6 +1216,76 @@ const VideoPlayer = ({
           </div>
         </div>
       )}
+
+      {/* Hidden dummy audio element for Web Audio API registration reference */}
+      <audio ref={audioRef} muted className="hidden" />
+
+      {/* 5. Custom Ad Player Overlay */}
+      {adPlaying && currentAd && (
+        <div className="absolute inset-0 bg-black z-[9999] flex items-center justify-center font-[Inter]">
+          <video
+            ref={adVideoRef}
+            src={getMediaUrl(currentAd.videoUrl)}
+            className="w-full h-full object-contain cursor-pointer"
+            autoPlay
+            playsInline
+            onClick={handleAdClick}
+            onTimeUpdate={handleAdTimeUpdate}
+            onLoadedMetadata={handleAdLoadedMetadata}
+            onEnded={handleAdEnded}
+          />
+          
+          {/* Ad Info Overlays */}
+          <div className="absolute top-6 left-6 flex items-center gap-3 bg-black/60 border border-white/10 px-4 py-2.5 rounded-xl backdrop-blur-md">
+            <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-ping"></div>
+            <div>
+              <span className="text-[10px] text-yellow-400 font-extrabold uppercase tracking-widest">Advertisement</span>
+              <h4 className="text-xs font-bold text-white leading-tight mt-0.5">{currentAd.title}</h4>
+            </div>
+          </div>
+
+          {/* Ad Call To Action Card */}
+          <div 
+            onClick={handleAdClick}
+            className="absolute bottom-16 left-6 max-w-sm bg-black/85 border border-white/10 p-3.5 rounded-xl backdrop-blur-md flex items-center gap-3 cursor-pointer hover:border-white/20 hover:bg-black/95 transition duration-200"
+          >
+            {currentAd.thumbnail && (
+              <img src={getMediaUrl(currentAd.thumbnail)} alt="ad thumb" className="w-12 h-12 object-cover rounded-lg border border-white/10" />
+            )}
+            <div className="overflow-hidden">
+              <h5 className="text-xs font-bold text-white truncate">{currentAd.title}</h5>
+              <p className="text-[10px] text-zinc-400 truncate mt-0.5">{currentAd.description || "Click to learn more"}</p>
+            </div>
+            <div className="ml-auto w-8 h-8 rounded-lg bg-yellow-400 flex items-center justify-center text-black font-bold">
+              <i className="ri-external-link-line"></i>
+            </div>
+          </div>
+
+          {/* Ad Controls / Skip Button - Repositioned to Top Right */}
+          <div className="absolute top-6 right-6 z-[99999] flex items-center gap-3">
+            {!adSkippable ? (
+              <div className="bg-black/65 border border-white/10 px-4 py-2.5 rounded-xl backdrop-blur-md text-xs font-bold text-zinc-300 select-none tracking-wide">
+                Ad <span className="text-yellow-400 font-mono ml-1.5">{formatTime(Math.max(0, adDuration - adCurrentTime))}</span>
+              </div>
+            ) : skipTimer > 0 ? (
+              <div className="bg-black/65 border border-white/10 px-4 py-2.5 rounded-xl backdrop-blur-md text-xs font-bold text-zinc-300 select-none tracking-wide">
+                Ad Skip in <span className="text-yellow-400 font-mono ml-1">{skipTimer}</span>...
+              </div>
+            ) : (
+              <button
+                onClick={handleSkipAd}
+                className="bg-yellow-400 hover:bg-yellow-300 text-black font-extrabold px-5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-lg shadow-yellow-400/20 border-0"
+              >
+                <span>Skip Ad</span>
+                <i className="ri-arrow-right-line font-bold"></i>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+
+
     </div>
   );
 };

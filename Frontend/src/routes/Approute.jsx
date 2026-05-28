@@ -16,6 +16,17 @@ const LoginPage = React.lazy(() => import('../pages/LoginPage'));
 const SignupPage = React.lazy(() => import('../pages/SignupPage'));
 const ProfilePage = React.lazy(() => import('../pages/ProfilePage'));
 
+// Admin Dashboard Components
+const AdminRoute = React.lazy(() => import('../components/AdminRoute'));
+const AdminLayout = React.lazy(() => import('../pages/Admin/AdminLayout'));
+const AdminDashboard = React.lazy(() => import('../pages/Admin/AdminDashboard'));
+const AdminUsers = React.lazy(() => import('../pages/Admin/AdminUsers'));
+const AdminAnalytics = React.lazy(() => import('../pages/Admin/AdminAnalytics'));
+const AdminContent = React.lazy(() => import('../pages/Admin/AdminContent'));
+const AdminWatch = React.lazy(() => import('../pages/Admin/AdminWatch'));
+const AdminSettings = React.lazy(() => import('../pages/Admin/AdminSettings'));
+const AdminAds = React.lazy(() => import('../pages/Admin/AdminAds'));
+
 const Approute = () => {
   return (
     <Suspense fallback={<Loader />}>
@@ -43,6 +54,17 @@ const Approute = () => {
         
         {/* Auth Protected Routes */}
         <Route path='/profile' element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+
+        {/* Admin Dashboard Protected Routes */}
+        <Route path='/admin' element={<AdminRoute><AdminLayout /></AdminRoute>}>
+          <Route index element={<AdminDashboard />} />
+          <Route path='users' element={<AdminUsers />} />
+          <Route path='analytics' element={<AdminAnalytics />} />
+          <Route path='content' element={<AdminContent />} />
+          <Route path='watch' element={<AdminWatch />} />
+          <Route path='settings' element={<AdminSettings />} />
+          <Route path='ads' element={<AdminAds />} />
+        </Route>
       </Routes>
     </Suspense>
   )
