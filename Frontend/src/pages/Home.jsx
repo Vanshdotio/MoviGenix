@@ -92,6 +92,11 @@ const Home = () => {
         {/* 1. Trending Movies (Rendered immediately since data is preloaded) */}
         <MediaSlider title="Trending Movies" items={trending} type="movie" viewMoreLink="/movies/trending" />
 
+        {/* 3. Continue Watching (Instant render from local auth profile state) */}
+        {user && mergedContinue.length > 0 && (
+          <MediaSlider title="Continue Watching" items={mergedContinue} type="movie" />
+        )}
+
         {/* 2. Top Rated Content (Lazy loaded on scroll) */}
         <LazyMediaRow title="Top Rated Content" fetchFn={getMovieTopRated} type="movie" viewMoreLink="/movies/top-rated" />
 
@@ -100,11 +105,6 @@ const Home = () => {
 
         {/* Tollywood & South Cinema */}
         <LazyMediaRow title="Tollywood & South Cinema" fetchFn={getTollywoodMovies} type="movie" viewMoreLink="/movies/tollywood" />
-
-        {/* 3. Continue Watching (Instant render from local auth profile state) */}
-        {user && mergedContinue.length > 0 && (
-          <MediaSlider title="Continue Watching" items={mergedContinue} type="movie" />
-        )}
 
         {/* 4. Recommended For You (Personalized - Lazy loaded) */}
         <LazyMediaRow 

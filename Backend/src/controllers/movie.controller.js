@@ -262,6 +262,42 @@ const minimizeList = (list, defaultType = "movie") => {
  * Helper to fetch minimal details for Continue Watching history items
  */
 const getMediaMinimalDetails = async (id, type) => {
+  if (type === "cartoon") {
+    // Cartoons can be either a tv series or a movie in TMDB
+    try {
+      const response = await fetchWithRetry(
+        `${TMDB_BASE_URL}/tv/${id}`,
+        getParams()
+      );
+      const data = response.data;
+      return {
+        title: data.title,
+        name: data.name,
+        poster_path: data.poster_path,
+        backdrop_path: data.backdrop_path,
+        vote_average: data.vote_average,
+      };
+    } catch (err) {
+      try {
+        const response = await fetchWithRetry(
+          `${TMDB_BASE_URL}/movie/${id}`,
+          getParams()
+        );
+        const data = response.data;
+        return {
+          title: data.title,
+          name: data.name,
+          poster_path: data.poster_path,
+          backdrop_path: data.backdrop_path,
+          vote_average: data.vote_average,
+        };
+      } catch (innerErr) {
+        console.error(`Error enriching cartoon ${id}:`, innerErr.message);
+        return null;
+      }
+    }
+  }
+
   const actualType = type === "anime" ? "tv" : type;
   try {
     const response = await fetchWithRetry(
@@ -274,6 +310,7 @@ const getMediaMinimalDetails = async (id, type) => {
       name: data.name,
       poster_path: data.poster_path,
       backdrop_path: data.backdrop_path,
+      vote_average: data.vote_average,
     };
   } catch (err) {
     console.error(`Error enriching item ${id} (${type}):`, err.message);
@@ -395,13 +432,13 @@ const getTrendingMovies = async (req, res) => {
     const { page } = req.query;
     if (page) {
       const response = await fetchWithRetry(`${TMDB_BASE_URL}/trending/movie/week`, getParams({ page }));
-      const filtered = await filterMediaList(response.data.results, "movie", req.user);
+      const filtered = await filterMediaList(response.data.results, "movie", { isAdult: true, safeMode: false, hideMature: false });
       return res.json(filtered);
     }
     const trendingRes = await fetchWithRetry(`${TMDB_BASE_URL}/trending/movie/week`, getParams());
     const indianRes = await fetchWithRetry(`${TMDB_BASE_URL}/discover/movie`, getParams({ with_original_language: "hi", sort_by: "popularity.desc" }));
     const merged = [...trendingRes.data.results.slice(0, 7), ...indianRes.data.results.slice(0, 3)];
-    const filtered = await filterMediaList(merged, "movie", req.user);
+    const filtered = await filterMediaList(merged, "movie", { isAdult: true, safeMode: false, hideMature: false });
     const enriched = await enrichWithLogos(filtered, "movie");
     res.json(enriched);
   } catch (error) {
@@ -1351,21 +1388,23 @@ const getAwardWinning = async (req, res) => {
 const getPersonalizedRecommendations = async (req, res) => {
   try {
     const { type = "movie", page = 1 } = req.query;
-    let referenceId = type === "anime" ? "31911" : (type === "tv" ? "1399" : "27205"); // Default fallbacks
-    let referenceType = type === "anime" ? "tv" : type;
+    // Default fallbacks: SpongeBob for cartoon/tv, Fullmetal for anime, Inception for movie
+    let referenceId = type === "anime" ? "31911" : (type === "cartoon" ? "1877" : (type === "tv" ? "1399" : "27205"));
+    let referenceType = type === "anime" || type === "cartoon" ? "tv" : type;
 
     if (req.user) {
       const User = require("../models/User.model");
       const user = await User.findById(req.user._id);
       
-      const watchlistKey = type === "movie" ? "movies" : (type === "tv" ? "tv" : "anime");
+      const watchlistKey = type === "movie" ? "movie" : (type === "tv" ? "tv" : (type === "anime" ? "anime" : "cartoon"));
       const watchlistArray = (user.watchlist && user.watchlist[watchlistKey]) || [];
       const filteredFavs = (user.favorites || []).filter(item => item.type === type);
       const recentItem = filteredFavs[0] || watchlistArray[0];
 
       if (recentItem) {
         referenceId = recentItem.id;
-        referenceType = type === "anime" ? "tv" : type;
+        const isTv = !!(recentItem.first_air_date || recentItem.name || recentItem.season || recentItem.episode || recentItem.showId || recentItem.animeId);
+        referenceType = isTv ? "tv" : "movie";
       }
     }
 
@@ -1377,6 +1416,12 @@ const getPersonalizedRecommendations = async (req, res) => {
     
     if (type === "anime") {
       results = results.filter(item => item.genre_ids && item.genre_ids.includes(16));
+    } else if (type === "cartoon") {
+      results = results.filter(item => {
+        const isAnimation = item.genre_ids && item.genre_ids.includes(16);
+        const isJapanese = item.original_language === "ja" || (item.origin_country && item.origin_country.includes("JP"));
+        return isAnimation && !isJapanese;
+      });
     }
     const filtered = await filterMediaList(results, type, req.user);
     res.json(filtered);
@@ -1391,6 +1436,9 @@ const getPersonalizedRecommendations = async (req, res) => {
       } else if (type === "anime") {
         fallbackUrl = `${TMDB_BASE_URL}/discover/tv`;
         fallbackParams = { with_genres: "16", sort_by: "popularity.desc", page };
+      } else if (type === "cartoon") {
+        fallbackUrl = `${TMDB_BASE_URL}/discover/tv`;
+        fallbackParams = { with_genres: "16", without_original_language: "ja", sort_by: "popularity.desc", page };
       }
       const fallback = await fetchWithRetry(fallbackUrl, getParams(fallbackParams));
       const filteredFallback = await filterMediaList(fallback.data.results, type, req.user);
@@ -1404,21 +1452,23 @@ const getPersonalizedRecommendations = async (req, res) => {
 const getBecauseYouWatched = async (req, res) => {
   try {
     const { type = "movie", page = 1 } = req.query;
-    let referenceId = type === "anime" ? "31911" : (type === "tv" ? "1399" : "27205"); // Default fallbacks
-    let referenceType = type === "anime" ? "tv" : type;
-    let title = type === "anime" ? "Fullmetal Alchemist: Brotherhood" : (type === "tv" ? "Game of Thrones" : "Inception");
+    // Default fallbacks: SpongeBob for cartoon/tv, Fullmetal for anime, Inception for movie
+    let referenceId = type === "anime" ? "31911" : (type === "cartoon" ? "1877" : (type === "tv" ? "1399" : "27205"));
+    let referenceType = type === "anime" || type === "cartoon" ? "tv" : type;
+    let title = type === "anime" ? "Fullmetal Alchemist: Brotherhood" : (type === "cartoon" ? "SpongeBob SquarePants" : (type === "tv" ? "Game of Thrones" : "Inception"));
 
     if (req.user) {
       const User = require("../models/User.model");
       const user = await User.findById(req.user._id);
-      const continueKey = type === "movie" ? "movies" : (type === "tv" ? "tv" : "anime");
+      const continueKey = type === "movie" ? "movie" : (type === "tv" ? "tv" : (type === "anime" ? "anime" : "cartoon"));
       const continueArray = (user && user.continueWatching && user.continueWatching[continueKey]) || [];
       
       if (continueArray.length > 0) {
         const recent = continueArray[0];
         if (recent) {
           referenceId = recent.movieId || recent.showId || recent.animeId || recent.id;
-          referenceType = type === "anime" ? "tv" : type;
+          const isTv = !!(recent.season || recent.episode || recent.showId || recent.animeId || type === "tv" || type === "anime");
+          referenceType = isTv ? "tv" : "movie";
           title = recent.title || recent.name || "your last watched item";
         }
       }
@@ -1432,6 +1482,12 @@ const getBecauseYouWatched = async (req, res) => {
     
     if (type === "anime") {
       results = results.filter(item => item.genre_ids && item.genre_ids.includes(16));
+    } else if (type === "cartoon") {
+      results = results.filter(item => {
+        const isAnimation = item.genre_ids && item.genre_ids.includes(16);
+        const isJapanese = item.original_language === "ja" || (item.origin_country && item.origin_country.includes("JP"));
+        return isAnimation && !isJapanese;
+      });
     }
     const filtered = await filterMediaList(results, type, req.user);
     res.json({
@@ -1441,7 +1497,7 @@ const getBecauseYouWatched = async (req, res) => {
   } catch (error) {
     console.error("Error in getBecauseYouWatched:", error.message);
     const { type = "movie" } = req.query;
-    let title = type === "anime" ? "Fullmetal Alchemist: Brotherhood" : (type === "tv" ? "Game of Thrones" : "Inception");
+    let title = type === "anime" ? "Fullmetal Alchemist: Brotherhood" : (type === "cartoon" ? "SpongeBob SquarePants" : (type === "tv" ? "Game of Thrones" : "Inception"));
     res.json({
       sourceTitle: title,
       results: []

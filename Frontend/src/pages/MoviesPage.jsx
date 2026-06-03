@@ -139,13 +139,13 @@ const MoviesPage = () => {
 
       {/* Standard Landing View with Movie Sections */}
       <div className="space-y-2 mt-4">
+        {/* 2. Trending Movies */}
+        <MediaSlider title="Trending Movies" items={trendingMovies} type="movie" viewMoreLink="/movies/trending" />
+
         {/* 1. Continue Watching (Movies only) */}
         {user && continueWatching.length > 0 && (
           <MediaSlider title="Continue Watching" items={continueWatching} type="movie" />
         )}
-
-        {/* 2. Trending Movies */}
-        <MediaSlider title="Trending Movies" items={trendingMovies} type="movie" viewMoreLink="/movies/trending" />
 
         {/* 3. Top Rated Movies */}
         <MediaSlider title="Top Rated Movies" items={topRatedMovies} type="movie" viewMoreLink="/movies/top-rated" />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { searchMedia } from "../services/api";
 import { trackSearch } from "../services/telemetry";
@@ -8,6 +8,14 @@ const SearchOverlay = () => {
   const [searchType, setSearchType] = useState("movie"); // 'movie', 'tv', 'anime', 'cartoon'
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -108,6 +116,7 @@ const SearchOverlay = () => {
 
           {/* Input */}
           <input
+            ref={inputRef}
             className="w-full h-8 outline-none border-none text-white placeholder-gray-400 bg-transparent text-base"
             type="search"
             placeholder={getPlaceholderText()}

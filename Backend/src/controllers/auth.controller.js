@@ -185,6 +185,7 @@ const enrichContinueWatchingLists = async (continueWatching) => {
             name: details?.name || item.name || "",
             poster_path: details?.poster_path || item.poster_path || "",
             backdrop_path: details?.backdrop_path || item.backdrop_path || "",
+            vote_average: details?.vote_average || item.vote_average || 0,
           };
         })
       );
