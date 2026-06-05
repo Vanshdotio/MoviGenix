@@ -12,12 +12,14 @@ const {
   toggleWatchlist,
   addContinueWatching,
   removeContinueWatching,
+  forgotPassword,
 } = require("../controllers/auth.controller");
 
 // Public auth routes
 router.post("/signup", signup);
 router.post("/login", login);
 router.post("/google", googleLogin);
+router.post("/forgot-password", forgotPassword);
 router.post("/logout", logout);
 
 // Protected user routes

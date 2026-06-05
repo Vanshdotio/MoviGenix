@@ -6,6 +6,12 @@ const Content = require("../models/Content.model");
 const { clearUserCache } = require("../middlewares/auth.middleware");
 const { getMediaMinimalDetails } = require("./movie.controller");
 const axios = require("axios");
+const {
+  verifyTurnstileToken,
+  shouldRequireCaptcha,
+  incrementFailedAttempts,
+  clearFailedAttempts,
+} = require("../utils/turnstile");
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const getApiKey = () => process.env.TMDB_API_KEY;
@@ -404,10 +410,17 @@ const setCookieToken = (res, token) => {
 // @route   POST /api/auth/signup
 // @access  Public
 const signup = async (req, res) => {
-  const { name, email, password, confirmPassword, dob } = req.body;
+  const { name, email, password, confirmPassword, dob, captchaToken } = req.body;
 
   if (!name || !email || !password || !confirmPassword || !dob) {
     return res.status(400).json({ error: "All fields are required." });
+  }
+
+  // Verify Turnstile CAPTCHA (Always required on Signup)
+  const isCaptchaValid = await verifyTurnstileToken(captchaToken, req.ip);
+  if (!isCaptchaValid) {
+    console.warn(`[Signup] Failed CAPTCHA check for IP ${req.ip}, Email: ${email}`);
+    return res.status(400).json({ error: "Please complete the security check." });
   }
 
   if (password !== confirmPassword) {
@@ -466,30 +479,73 @@ const signup = async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 const login = async (req, res) => {
-  const { email, password, rememberMe } = req.body;
+  const { email, password, rememberMe, captchaToken } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required." });
   }
 
+  // Check if CAPTCHA is required (due to >5 failures)
+  const captchaRequired = await shouldRequireCaptcha(req.ip, email);
+
+  if (captchaRequired || captchaToken) {
+    const isCaptchaValid = await verifyTurnstileToken(captchaToken, req.ip);
+    if (!isCaptchaValid) {
+      console.warn(`[Login] Failed or missing CAPTCHA check for IP: ${req.ip}, Email: ${email}`);
+      await incrementFailedAttempts(req.ip, email, "login");
+      if (captchaRequired) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      return res.status(400).json({
+        error: "Please complete the security check.",
+        captchaRequired: true,
+      });
+    }
+  }
+
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ error: "Invalid email or password." });
+      await incrementFailedAttempts(req.ip, email, "login");
+      const nextCaptchaRequired = await shouldRequireCaptcha(req.ip, email);
+      if (nextCaptchaRequired) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      return res.status(400).json({
+        error: "Invalid email or password.",
+        captchaRequired: nextCaptchaRequired,
+      });
     }
 
     // Google-only users might not have a password
     if (!user.password) {
+      await incrementFailedAttempts(req.ip, email, "login");
+      const nextCaptchaRequired = await shouldRequireCaptcha(req.ip, email);
+      if (nextCaptchaRequired) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
       return res.status(400).json({
         error:
           "This email is registered with Google Sign-in. Please log in with Google.",
+        captchaRequired: nextCaptchaRequired,
       });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ error: "Invalid email or password." });
+      await incrementFailedAttempts(req.ip, email, "login");
+      const nextCaptchaRequired = await shouldRequireCaptcha(req.ip, email);
+      if (nextCaptchaRequired) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      return res.status(400).json({
+        error: "Invalid email or password.",
+        captchaRequired: nextCaptchaRequired,
+      });
     }
+
+    // Success! Clear failed attempts
+    await clearFailedAttempts(req.ip, email);
 
     // Recalculate age on every login (user may have turned 18 since last session)
     if (user.dob) {
@@ -541,12 +597,30 @@ const login = async (req, res) => {
 // @route   POST /api/auth/google
 // @access  Public
 const googleLogin = async (req, res) => {
-  const { credential } = req.body;
+  const { credential, captchaToken } = req.body;
 
   if (!credential) {
     return res
       .status(400)
       .json({ error: "Google credential token is missing." });
+  }
+
+  // Google login CAPTCHA is optional normally, but required if it has failed repeatedly from this IP
+  const captchaRequired = await shouldRequireCaptcha(req.ip, null);
+
+  if (captchaRequired || captchaToken) {
+    const isCaptchaValid = await verifyTurnstileToken(captchaToken, req.ip);
+    if (!isCaptchaValid) {
+      console.warn(`[Google Login] Failed or missing CAPTCHA check for IP: ${req.ip}`);
+      await incrementFailedAttempts(req.ip, null, "google");
+      if (captchaRequired) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      return res.status(400).json({
+        error: "Please complete the security check.",
+        captchaRequired: true,
+      });
+    }
   }
 
   try {
@@ -597,6 +671,9 @@ const googleLogin = async (req, res) => {
       await user.save();
     }
 
+    // Success! Clear failed attempts
+    await clearFailedAttempts(req.ip, email);
+
     const token = generateToken(user._id);
     setCookieToken(res, token);
 
@@ -609,7 +686,15 @@ const googleLogin = async (req, res) => {
     });
   } catch (error) {
     console.error("Google Auth Error:", error.message);
-    return res.status(400).json({ error: "Google authentication failed." });
+    await incrementFailedAttempts(req.ip, null, "google");
+    const nextCaptchaRequired = await shouldRequireCaptcha(req.ip, null);
+    if (nextCaptchaRequired) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    return res.status(400).json({
+      error: "Google authentication failed.",
+      captchaRequired: nextCaptchaRequired,
+    });
   }
 };
 
@@ -1071,6 +1156,36 @@ const removeContinueWatching = async (req, res) => {
   }
 };
 
+// @desc    Request forgot password reset link
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = async (req, res) => {
+  const { email, captchaToken } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email is required." });
+  }
+
+  // Always require CAPTCHA for forgot password
+  const isCaptchaValid = await verifyTurnstileToken(captchaToken, req.ip);
+  if (!isCaptchaValid) {
+    console.warn(`[Forgot Password] Failed CAPTCHA verification from IP: ${req.ip}`);
+    return res.status(400).json({ error: "Please complete the security check." });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    // Return mock success response to avoid email enumeration
+    console.log(`[Forgot Password] Password reset requested for email: ${email}`);
+    return res.json({
+      message: "A password reset link has been sent to your email (Mock Flow).",
+    });
+  } catch (error) {
+    console.error("Forgot Password Error:", error.message);
+    return res.status(500).json({ error: "Server error during password reset request." });
+  }
+};
+
 module.exports = {
   signup,
   login,
@@ -1082,4 +1197,5 @@ module.exports = {
   toggleWatchlist,
   addContinueWatching,
   removeContinueWatching,
+  forgotPassword,
 };

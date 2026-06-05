@@ -411,8 +411,8 @@ export const loginUser = async (data) => {
   return response.data;
 };
 
-export const googleLoginUser = async (credential) => {
-  const response = await authClient.post("/google", { credential });
+export const googleLoginUser = async (credential, captchaToken) => {
+  const response = await authClient.post("/google", { credential, captchaToken });
   return response.data;
 };
 

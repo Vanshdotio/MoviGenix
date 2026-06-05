@@ -14,6 +14,7 @@ const PersonPage = React.lazy(() => import('../pages/PersonPage'));
 
 const LoginPage = React.lazy(() => import('../pages/LoginPage'));
 const SignupPage = React.lazy(() => import('../pages/SignupPage'));
+const ForgotPasswordPage = React.lazy(() => import('../pages/ForgotPasswordPage'));
 const ProfilePage = React.lazy(() => import('../pages/ProfilePage'));
 
 // Admin Dashboard Components
@@ -51,6 +52,7 @@ const Approute = () => {
         {/* Auth Guest Routes */}
         <Route path='/login' element={<GuestRoute><LoginPage /></GuestRoute>} />
         <Route path='/signup' element={<GuestRoute><SignupPage /></GuestRoute>} />
+        <Route path='/forgot-password' element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
         
         {/* Auth Protected Routes */}
         <Route path='/profile' element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
