@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../context/AuthContext";
 import { getPopularMovies } from "../services/api";
-import TurnstileWidget from "../components/TurnstileWidget";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -17,10 +16,6 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  
-  const [captchaToken, setCaptchaToken] = useState("");
-  const [captchaRequired, setCaptchaRequired] = useState(false);
-  const resetTurnstileRef = useRef(null);
   
   // Background posters state
   const [posters, setPosters] = useState([]);
@@ -62,25 +57,12 @@ const LoginPage = () => {
       return;
     }
 
-    if (captchaRequired && !captchaToken) {
-      setErrorMsg("Please complete the security check.");
-      return;
-    }
-
     try {
       setLoading(true);
-      await login(email, password, rememberMe, captchaToken);
+      await login(email, password, rememberMe);
       navigate("/");
     } catch (err) {
       setErrorMsg(err.message || "Invalid credentials.");
-      if (err.captchaRequired) {
-        setCaptchaRequired(true);
-      }
-      // Reset CAPTCHA widget on error to get a fresh token
-      if (resetTurnstileRef.current) {
-        resetTurnstileRef.current();
-      }
-      setCaptchaToken("");
     } finally {
       setLoading(false);
     }
@@ -90,25 +72,12 @@ const LoginPage = () => {
     setErrorMsg("");
     setSuccessMsg("");
     
-    if (captchaRequired && !captchaToken) {
-      setErrorMsg("Please complete the security check.");
-      return;
-    }
-
     try {
       setLoading(true);
-      await googleLogin(credentialResponse.credential, captchaToken);
+      await googleLogin(credentialResponse.credential);
       navigate("/");
     } catch (err) {
       setErrorMsg(err.message || "Google authentication failed.");
-      if (err.captchaRequired) {
-        setCaptchaRequired(true);
-      }
-      // Reset CAPTCHA widget on error to get a fresh token
-      if (resetTurnstileRef.current) {
-        resetTurnstileRef.current();
-      }
-      setCaptchaToken("");
       setLoading(false);
     }
   };
@@ -243,19 +212,6 @@ const LoginPage = () => {
             >
               Forgot Password?
             </Link>
-          </div>
-
-          {/* Cloudflare Turnstile Widget (Required if captchaRequired is true, or always rendered to collect token if available) */}
-          <div className="py-1">
-            <TurnstileWidget
-              onVerify={(token) => setCaptchaToken(token)}
-              onExpire={() => setCaptchaToken("")}
-              onError={() => {
-                setCaptchaToken("");
-                setErrorMsg("Security check failed. Please refresh the page.");
-              }}
-              resetRef={resetTurnstileRef}
-            />
           </div>
 
           {/* Submit Button */}

@@ -7,11 +7,10 @@ const { clearUserCache } = require("../middlewares/auth.middleware");
 const { getMediaMinimalDetails } = require("./movie.controller");
 const axios = require("axios");
 const {
-  verifyTurnstileToken,
   shouldRequireCaptcha,
   incrementFailedAttempts,
   clearFailedAttempts,
-} = require("../utils/turnstile");
+} = require("../utils/security");
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const getApiKey = () => process.env.TMDB_API_KEY;
@@ -410,17 +409,10 @@ const setCookieToken = (res, token) => {
 // @route   POST /api/auth/signup
 // @access  Public
 const signup = async (req, res) => {
-  const { name, email, password, confirmPassword, dob, captchaToken } = req.body;
+  const { name, email, password, confirmPassword, dob } = req.body;
 
   if (!name || !email || !password || !confirmPassword || !dob) {
     return res.status(400).json({ error: "All fields are required." });
-  }
-
-  // Verify Turnstile CAPTCHA (Always required on Signup)
-  const isCaptchaValid = await verifyTurnstileToken(captchaToken, req.ip);
-  if (!isCaptchaValid) {
-    console.warn(`[Signup] Failed CAPTCHA check for IP ${req.ip}, Email: ${email}`);
-    return res.status(400).json({ error: "Please complete the security check." });
   }
 
   if (password !== confirmPassword) {
@@ -479,69 +471,38 @@ const signup = async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 const login = async (req, res) => {
-  const { email, password, rememberMe, captchaToken } = req.body;
+  const { email, password, rememberMe } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required." });
   }
 
-  // Check if CAPTCHA is required (due to >5 failures)
-  const captchaRequired = await shouldRequireCaptcha(req.ip, email);
-
-  if (captchaRequired || captchaToken) {
-    const isCaptchaValid = await verifyTurnstileToken(captchaToken, req.ip);
-    if (!isCaptchaValid) {
-      console.warn(`[Login] Failed or missing CAPTCHA check for IP: ${req.ip}, Email: ${email}`);
-      await incrementFailedAttempts(req.ip, email, "login");
-      if (captchaRequired) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-      return res.status(400).json({
-        error: "Please complete the security check.",
-        captchaRequired: true,
-      });
-    }
+  // Check if throttling is required (due to >5 failures)
+  const shouldThrottle = await shouldRequireCaptcha(req.ip, email);
+  if (shouldThrottle) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
   try {
     const user = await User.findOne({ email });
     if (!user) {
       await incrementFailedAttempts(req.ip, email, "login");
-      const nextCaptchaRequired = await shouldRequireCaptcha(req.ip, email);
-      if (nextCaptchaRequired) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-      return res.status(400).json({
-        error: "Invalid email or password.",
-        captchaRequired: nextCaptchaRequired,
-      });
+      return res.status(400).json({ error: "Invalid email or password." });
     }
 
     // Google-only users might not have a password
     if (!user.password) {
       await incrementFailedAttempts(req.ip, email, "login");
-      const nextCaptchaRequired = await shouldRequireCaptcha(req.ip, email);
-      if (nextCaptchaRequired) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
       return res.status(400).json({
         error:
           "This email is registered with Google Sign-in. Please log in with Google.",
-        captchaRequired: nextCaptchaRequired,
       });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       await incrementFailedAttempts(req.ip, email, "login");
-      const nextCaptchaRequired = await shouldRequireCaptcha(req.ip, email);
-      if (nextCaptchaRequired) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-      return res.status(400).json({
-        error: "Invalid email or password.",
-        captchaRequired: nextCaptchaRequired,
-      });
+      return res.status(400).json({ error: "Invalid email or password." });
     }
 
     // Success! Clear failed attempts
@@ -597,7 +558,7 @@ const login = async (req, res) => {
 // @route   POST /api/auth/google
 // @access  Public
 const googleLogin = async (req, res) => {
-  const { credential, captchaToken } = req.body;
+  const { credential } = req.body;
 
   if (!credential) {
     return res
@@ -605,22 +566,10 @@ const googleLogin = async (req, res) => {
       .json({ error: "Google credential token is missing." });
   }
 
-  // Google login CAPTCHA is optional normally, but required if it has failed repeatedly from this IP
-  const captchaRequired = await shouldRequireCaptcha(req.ip, null);
-
-  if (captchaRequired || captchaToken) {
-    const isCaptchaValid = await verifyTurnstileToken(captchaToken, req.ip);
-    if (!isCaptchaValid) {
-      console.warn(`[Google Login] Failed or missing CAPTCHA check for IP: ${req.ip}`);
-      await incrementFailedAttempts(req.ip, null, "google");
-      if (captchaRequired) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-      return res.status(400).json({
-        error: "Please complete the security check.",
-        captchaRequired: true,
-      });
-    }
+  // Throttle request if they failed too many times from this IP
+  const shouldThrottle = await shouldRequireCaptcha(req.ip, null);
+  if (shouldThrottle) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
   try {
@@ -687,13 +636,12 @@ const googleLogin = async (req, res) => {
   } catch (error) {
     console.error("Google Auth Error:", error.message);
     await incrementFailedAttempts(req.ip, null, "google");
-    const nextCaptchaRequired = await shouldRequireCaptcha(req.ip, null);
-    if (nextCaptchaRequired) {
+    const nextShouldThrottle = await shouldRequireCaptcha(req.ip, null);
+    if (nextShouldThrottle) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
     return res.status(400).json({
       error: "Google authentication failed.",
-      captchaRequired: nextCaptchaRequired,
     });
   }
 };
@@ -1160,17 +1108,10 @@ const removeContinueWatching = async (req, res) => {
 // @route   POST /api/auth/forgot-password
 // @access  Public
 const forgotPassword = async (req, res) => {
-  const { email, captchaToken } = req.body;
+  const { email } = req.body;
 
   if (!email) {
     return res.status(400).json({ error: "Email is required." });
-  }
-
-  // Always require CAPTCHA for forgot password
-  const isCaptchaValid = await verifyTurnstileToken(captchaToken, req.ip);
-  if (!isCaptchaValid) {
-    console.warn(`[Forgot Password] Failed CAPTCHA verification from IP: ${req.ip}`);
-    return res.status(400).json({ error: "Please complete the security check." });
   }
 
   try {

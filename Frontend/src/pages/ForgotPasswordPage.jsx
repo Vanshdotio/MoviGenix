@@ -1,17 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getPopularMovies } from "../services/api";
 import { authClient } from "../services/api";
-import TurnstileWidget from "../components/TurnstileWidget";
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [captchaToken, setCaptchaToken] = useState("");
   const [posters, setPosters] = useState([]);
-  const resetTurnstileRef = useRef(null);
 
   useEffect(() => {
     // Fetch popular movie poster paths for the dynamic background collage
@@ -48,16 +45,10 @@ const ForgotPasswordPage = () => {
       return;
     }
 
-    if (!captchaToken) {
-      setErrorMsg("Please complete the security check.");
-      return;
-    }
-
     try {
       setLoading(true);
       const response = await authClient.post("/forgot-password", {
         email,
-        captchaToken,
       });
 
       setSuccessMsg(
@@ -70,10 +61,6 @@ const ForgotPasswordPage = () => {
         err.response?.data?.error ||
           "Something went wrong. Please try again."
       );
-      // Reset CAPTCHA widget on error to get a fresh token
-      if (resetTurnstileRef.current) {
-        resetTurnstileRef.current();
-      }
     } finally {
       setLoading(false);
     }
@@ -153,18 +140,7 @@ const ForgotPasswordPage = () => {
             />
           </div>
 
-          {/* Cloudflare Turnstile CAPTCHA Widget */}
-          <div className="py-1">
-            <TurnstileWidget
-              onVerify={(token) => setCaptchaToken(token)}
-              onExpire={() => setCaptchaToken("")}
-              onError={() => {
-                setCaptchaToken("");
-                setErrorMsg("Security check failed. Please refresh the page.");
-              }}
-              resetRef={resetTurnstileRef}
-            />
-          </div>
+
 
           {/* Submit Button */}
           <button

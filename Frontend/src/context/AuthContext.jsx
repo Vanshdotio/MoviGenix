@@ -68,30 +68,28 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  const login = async (email, password, rememberMe, captchaToken) => {
+  const login = async (email, password, rememberMe) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await loginUser({ email, password, rememberMe, captchaToken });
+      const data = await loginUser({ email, password, rememberMe });
       if (data.token) localStorage.setItem("authToken", data.token);
       setUser(data.user);
       return data.user;
     } catch (err) {
       const errMsg = err.response?.data?.error || "Invalid credentials. Please try again.";
       setError(errMsg);
-      const errorObj = new Error(errMsg);
-      errorObj.captchaRequired = err.response?.data?.captchaRequired || false;
-      throw errorObj;
+      throw new Error(errMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  const signup = async (name, email, password, confirmPassword, dob, captchaToken) => {
+  const signup = async (name, email, password, confirmPassword, dob) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await signupUser({ name, email, password, confirmPassword, dob, captchaToken });
+      const data = await signupUser({ name, email, password, confirmPassword, dob });
       if (data.token) localStorage.setItem("authToken", data.token);
       setUser(data.user);
       return data.user;
@@ -104,20 +102,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const googleLogin = async (credential, captchaToken) => {
+  const googleLogin = async (credential) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await googleLoginUser(credential, captchaToken);
+      const data = await googleLoginUser(credential);
       if (data.token) localStorage.setItem("authToken", data.token);
       setUser(data.user);
       return data.user;
     } catch (err) {
       const errMsg = err.response?.data?.error || "Google sign in failed.";
       setError(errMsg);
-      const errorObj = new Error(errMsg);
-      errorObj.captchaRequired = err.response?.data?.captchaRequired || false;
-      throw errorObj;
+      throw new Error(errMsg);
     } finally {
       setLoading(false);
     }

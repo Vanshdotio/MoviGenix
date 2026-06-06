@@ -1,58 +1,4 @@
-const axios = require("axios");
 const FailedAttempt = require("../models/FailedAttempt.model");
-
-/**
- * Verifies the Cloudflare Turnstile token using Cloudflare siteverify API.
- * @param {string} token - The token received from frontend
- * @param {string} ip - The remote IP address of the client
- * @returns {Promise<boolean>} - True if verified, false otherwise
- */
-const verifyTurnstileToken = async (token, ip) => {
-  const secretKey = process.env.TURNSTILE_SECRET_KEY;
-  if (!secretKey) {
-    console.error("[Turnstile] TURNSTILE_SECRET_KEY is not configured.");
-    return false;
-  }
-
-  if (!token) {
-    console.warn("[Turnstile] No token provided for verification.");
-    return false;
-  }
-
-  try {
-    const params = new URLSearchParams();
-    params.append("secret", secretKey);
-    params.append("response", token);
-    if (ip) {
-      params.append("remoteip", ip);
-    }
-
-    const response = await axios.post(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-      params,
-      {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      }
-    );
-
-    const data = response.data;
-    if (data.success) {
-      return true;
-    } else {
-      console.warn(
-        `[Turnstile] Verification failed for IP ${ip}. Error codes: ${JSON.stringify(
-          data["error-codes"]
-        )}`
-      );
-      return false;
-    }
-  } catch (error) {
-    console.error("[Turnstile] Verification API request error:", error.message);
-    return false;
-  }
-};
 
 /**
  * Gets the number of failed login attempts from a given IP or email in the last 15 minutes.
@@ -100,7 +46,7 @@ const incrementFailedAttempts = async (ip, email, action) => {
 };
 
 /**
- * Determines whether CAPTCHA verification should be required.
+ * Determines whether login attempts should be throttled.
  * @param {string} ip
  * @param {string} email
  * @returns {Promise<boolean>}
@@ -133,7 +79,6 @@ const clearFailedAttempts = async (ip, email) => {
 };
 
 module.exports = {
-  verifyTurnstileToken,
   getFailedAttemptsCount,
   incrementFailedAttempts,
   shouldRequireCaptcha,

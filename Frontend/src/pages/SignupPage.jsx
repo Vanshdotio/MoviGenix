@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../context/AuthContext";
 import { getPopularMovies } from "../services/api";
-import TurnstileWidget from "../components/TurnstileWidget";
 
 const SignupPage = () => {
   const navigate = useNavigate();
@@ -20,8 +19,6 @@ const SignupPage = () => {
   
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [captchaToken, setCaptchaToken] = useState("");
-  const resetTurnstileRef = useRef(null);
   
   // Background posters state
   const [posters, setPosters] = useState([]);
@@ -71,21 +68,12 @@ const SignupPage = () => {
       return;
     }
 
-    if (!captchaToken) {
-      setErrorMsg("Please complete the security check.");
-      return;
-    }
-
     try {
       setLoading(true);
-      await signup(name, email, password, confirmPassword, dob, captchaToken);
+      await signup(name, email, password, confirmPassword, dob);
       navigate("/");
     } catch (err) {
       setErrorMsg(err.message || "Failed to create account.");
-      if (resetTurnstileRef.current) {
-        resetTurnstileRef.current();
-      }
-      setCaptchaToken("");
     } finally {
       setLoading(false);
     }
@@ -95,14 +83,10 @@ const SignupPage = () => {
     setErrorMsg("");
     try {
       setLoading(true);
-      await googleLogin(credentialResponse.credential, captchaToken);
+      await googleLogin(credentialResponse.credential);
       navigate("/");
     } catch (err) {
       setErrorMsg(err.message || "Google authentication failed.");
-      if (resetTurnstileRef.current) {
-        resetTurnstileRef.current();
-      }
-      setCaptchaToken("");
       setLoading(false);
     }
   };
@@ -261,18 +245,7 @@ const SignupPage = () => {
             />
           </div>
 
-          {/* Cloudflare Turnstile Widget (Required for Signup) */}
-          <div className="py-1">
-            <TurnstileWidget
-              onVerify={(token) => setCaptchaToken(token)}
-              onExpire={() => setCaptchaToken("")}
-              onError={() => {
-                setCaptchaToken("");
-                setErrorMsg("Security check failed. Please refresh the page.");
-              }}
-              resetRef={resetTurnstileRef}
-            />
-          </div>
+
 
           {/* Submit Button */}
           <button
