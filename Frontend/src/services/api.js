@@ -517,6 +517,41 @@ export const toggleUserPremiumApi = async (userId) => {
   return response.data;
 };
 
+export const getUserDetailsApi = async (userId) => {
+  const response = await adminClient.get(`/users/${userId}`);
+  return response.data;
+};
+
+export const updateUserDetailsApi = async (userId, userData) => {
+  const response = await adminClient.put(`/users/${userId}`, userData);
+  return response.data;
+};
+
+export const toggleUserSuspensionApi = async (userId) => {
+  const response = await adminClient.put(`/users/${userId}/suspend`);
+  return response.data;
+};
+
+export const deleteUserApi = async (userId) => {
+  const response = await adminClient.delete(`/users/${userId}`);
+  return response.data;
+};
+
+export const getContentRatingsApi = async (params) => {
+  const response = await adminClient.get("/content-ratings", { params });
+  return response.data;
+};
+
+export const updateContentRatingApi = async (ratingId, ageRating) => {
+  const response = await adminClient.put(`/content-ratings/${ratingId}`, { ageRating });
+  return response.data;
+};
+
+export const addContentRatingApi = async (ratingData) => {
+  const response = await adminClient.post("/content-ratings/add", ratingData);
+  return response.data;
+};
+
 // Ads Client & API Calls
 export const adsClient = axios.create({
   baseURL: `${BACKEND_URL}/api/ads`,

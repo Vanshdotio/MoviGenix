@@ -19,6 +19,7 @@ const SignupPage = () => {
   
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [errors, setErrors] = useState({});
   
   // Background posters state
   const [posters, setPosters] = useState([]);
@@ -45,26 +46,49 @@ const SignupPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg("");
+    setErrors({});
 
-    // Validations
-    if (!name.trim() || !email.trim() || !password || !confirmPassword || !dob) {
-      setErrorMsg("All fields are required.");
-      return;
+    const newErrors = {};
+    if (!name.trim()) {
+      newErrors.name = "Name is required.";
     }
 
-    if (password.length < 6) {
-      setErrorMsg("Password must be at least 6 characters long.");
-      return;
+    if (!email.trim()) {
+      newErrors.email = "Email is required.";
+    } else {
+      // Regex that checks for '@' and ending with '.com' (matches the request email(@and.com))
+      const emailRegex = /^[^\s@]+@[^\s@]+\.com$/i;
+      if (!emailRegex.test(email)) {
+        newErrors.email = "Please enter a valid email containing '@' and ending with '.com'.";
+      }
     }
 
-    if (password !== confirmPassword) {
-      setErrorMsg("Passwords do not match.");
-      return;
+    if (!password) {
+      newErrors.password = "Password is required.";
+    } else {
+      if (password.length < 6) {
+        newErrors.password = "Password must be at least 6 characters long.";
+      } else if (!/[A-Z]/.test(password)) {
+        newErrors.password = "Password must contain at least one capital letter.";
+      } else if (!/\d/.test(password)) {
+        newErrors.password = "Password must contain at least one number.";
+      } else if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+        newErrors.password = "Password must contain at least one special character.";
+      }
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setErrorMsg("Please enter a valid email address.");
+    if (!confirmPassword) {
+      newErrors.confirmPassword = "Confirm password is required.";
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match.";
+    }
+
+    if (!dob) {
+      newErrors.dob = "Date of birth is required.";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
@@ -73,7 +97,25 @@ const SignupPage = () => {
       await signup(name, email, password, confirmPassword, dob);
       navigate("/");
     } catch (err) {
-      setErrorMsg(err.message || "Failed to create account.");
+      const errMsg = err.message || "Failed to create account.";
+      setErrorMsg(errMsg);
+      
+      const lowerMsg = errMsg.toLowerCase();
+      const newErrors = {};
+      if (lowerMsg.includes("email") || lowerMsg.includes("already registered") || lowerMsg.includes("in use")) {
+        newErrors.email = errMsg;
+      }
+      if (lowerMsg.includes("password")) {
+        newErrors.password = errMsg;
+        newErrors.confirmPassword = errMsg;
+      }
+      if (lowerMsg.includes("name")) {
+        newErrors.name = errMsg;
+      }
+      if (lowerMsg.includes("dob") || lowerMsg.includes("date") || lowerMsg.includes("age") || lowerMsg.includes("minor")) {
+        newErrors.dob = errMsg;
+      }
+      setErrors(newErrors);
     } finally {
       setLoading(false);
     }
@@ -145,18 +187,25 @@ const SignupPage = () => {
         )}
 
         {/* Signup Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           {/* Name input */}
           <div className="relative">
             <input
               type="text"
               id="name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/5 focus:border-blue-500 text-white text-sm placeholder-zinc-500 outline-none transition duration-200"
+              onChange={(e) => {
+                setName(e.target.value);
+                if (errors.name) setErrors(prev => ({ ...prev, name: "" }));
+              }}
+              className={`w-full px-4 py-3 rounded-xl bg-zinc-900/60 border text-white text-sm placeholder-zinc-500 outline-none transition duration-200 ${
+                errors.name ? "border-red-500 focus:border-red-500" : "border-white/5 focus:border-blue-500"
+              }`}
               placeholder="Your Name"
-              required
             />
+            {errors.name && (
+              <p className="text-red-400 text-xs mt-1 pl-1 text-left">{errors.name}</p>
+            )}
           </div>
 
           {/* Email input */}
@@ -165,11 +214,18 @@ const SignupPage = () => {
               type="email"
               id="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/5 focus:border-blue-500 text-white text-sm placeholder-zinc-500 outline-none transition duration-200"
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errors.email) setErrors(prev => ({ ...prev, email: "" }));
+              }}
+              className={`w-full px-4 py-3 rounded-xl bg-zinc-900/60 border text-white text-sm placeholder-zinc-500 outline-none transition duration-200 ${
+                errors.email ? "border-red-500 focus:border-red-500" : "border-white/5 focus:border-blue-500"
+              }`}
               placeholder="Email Address"
-              required
             />
+            {errors.email && (
+              <p className="text-red-400 text-xs mt-1 pl-1 text-left">{errors.email}</p>
+            )}
           </div>
 
           {/* Password input */}
@@ -178,10 +234,14 @@ const SignupPage = () => {
               type={showPassword ? "text" : "password"}
               id="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 pr-12 rounded-xl bg-zinc-900/60 border border-white/5 focus:border-blue-500 text-white text-sm placeholder-zinc-500 outline-none transition duration-200"
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (errors.password) setErrors(prev => ({ ...prev, password: "" }));
+              }}
+              className={`w-full px-4 py-3 pr-12 rounded-xl bg-zinc-900/60 border text-white text-sm placeholder-zinc-500 outline-none transition duration-200 ${
+                errors.password ? "border-red-500 focus:border-red-500" : "border-white/5 focus:border-blue-500"
+              }`}
               placeholder="Password (min 6 characters)"
-              required
             />
             {/* Show/Hide password toggle */}
             <button
@@ -199,6 +259,9 @@ const SignupPage = () => {
                 </svg>
               )}
             </button>
+            {errors.password && (
+              <p className="text-red-400 text-xs mt-1 pl-1 text-left">{errors.password}</p>
+            )}
           </div>
 
           {/* Confirm Password input */}
@@ -207,10 +270,14 @@ const SignupPage = () => {
               type={showConfirmPassword ? "text" : "password"}
               id="confirmPassword"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 pr-12 rounded-xl bg-zinc-900/60 border border-white/5 focus:border-blue-500 text-white text-sm placeholder-zinc-500 outline-none transition duration-200"
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                if (errors.confirmPassword) setErrors(prev => ({ ...prev, confirmPassword: "" }));
+              }}
+              className={`w-full px-4 py-3 pr-12 rounded-xl bg-zinc-900/60 border text-white text-sm placeholder-zinc-500 outline-none transition duration-200 ${
+                errors.confirmPassword ? "border-red-500 focus:border-red-500" : "border-white/5 focus:border-blue-500"
+              }`}
               placeholder="Confirm Password"
-              required
             />
             {/* Show/Hide password toggle */}
             <button
@@ -228,6 +295,9 @@ const SignupPage = () => {
                 </svg>
               )}
             </button>
+            {errors.confirmPassword && (
+              <p className="text-red-400 text-xs mt-1 pl-1 text-left">{errors.confirmPassword}</p>
+            )}
           </div>
 
           {/* Date of Birth input */}
@@ -239,10 +309,17 @@ const SignupPage = () => {
               type="date"
               id="dob"
               value={dob}
-              onChange={(e) => setDob(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/5 focus:border-blue-500 text-white text-sm outline-none transition duration-200 cursor-pointer [color-scheme:dark]"
-              required
+              onChange={(e) => {
+                setDob(e.target.value);
+                if (errors.dob) setErrors(prev => ({ ...prev, dob: "" }));
+              }}
+              className={`w-full px-4 py-3 rounded-xl bg-zinc-900/60 border text-white text-sm outline-none transition duration-200 cursor-pointer [color-scheme:dark] ${
+                errors.dob ? "border-red-500 focus:border-red-500" : "border-white/5 focus:border-blue-500"
+              }`}
             />
+            {errors.dob && (
+              <p className="text-red-400 text-xs mt-1 pl-1 text-left">{errors.dob}</p>
+            )}
           </div>
 
 

@@ -3,6 +3,10 @@ const Session = require("../models/Session.model");
 const WatchHistory = require("../models/WatchHistory.model");
 const SearchHistory = require("../models/SearchHistory.model");
 const PlayerEvent = require("../models/PlayerEvent.model");
+const FailedAttempt = require("../models/FailedAttempt.model");
+const AuditLog = require("../models/AuditLog.model");
+const Content = require("../models/Content.model");
+const axios = require("axios");
 const { seedAnalyticsData } = require("../db/seedAnalytics");
 
 // Background simulator variables
@@ -198,7 +202,10 @@ const getUsersList = async (req, res) => {
         country: u.country || "India",
         loginMethod: u.googleId ? "Google" : "Email",
         createdAt: u.createdAt,
-        lastActive: lastSession ? lastSession.lastActive : u.updatedAt
+        lastActive: lastSession ? lastSession.lastActive : u.updatedAt,
+        dob: u.dob || "",
+        avatar: u.avatar || "",
+        suspended: u.suspended || false
       };
     }));
 
@@ -594,6 +601,290 @@ const toggleUserPremium = async (req, res) => {
   }
 };
 
+const getUserDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id).select("-password");
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    const watchHistoryCount = await WatchHistory.countDocuments({ userId: id });
+    const searchHistoryCount = await SearchHistory.countDocuments({ userId: id });
+    const activeSessions = await Session.find({ userId: id }).sort({ lastActive: -1 });
+
+    res.status(200).json({
+      success: true,
+      user,
+      stats: {
+        watchHistoryCount,
+        searchHistoryCount,
+        activeSessions
+      }
+    });
+  } catch (error) {
+    console.error("Get User Details Error:", error.message);
+    res.status(500).json({ error: "Failed to fetch user details." });
+  }
+};
+
+const updateUserDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, role, country, dob, isPremium } = req.body;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    if (name) user.name = name.trim();
+    if (email) user.email = email.trim().toLowerCase();
+    if (role) {
+      if (!["user", "admin", "superadmin"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role value." });
+      }
+      user.role = role;
+    }
+    if (country) user.country = country.trim();
+    if (dob) {
+      user.dob = dob;
+      const calculateAge = (dobString) => {
+        if (!dobString) return 0;
+        const today = new Date();
+        const birthDate = new Date(dobString);
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        return age;
+      };
+      const age = calculateAge(dob);
+      user.age = age;
+      user.isAdult = age >= 18;
+      if (!user.isAdult) {
+        user.safeMode = true;
+        user.hideMature = true;
+      }
+    }
+    if (isPremium !== undefined) {
+      user.isPremium = !!isPremium;
+    }
+
+    await user.save();
+    const { clearUserCache } = require("../middlewares/auth.middleware");
+    clearUserCache(id);
+
+    res.status(200).json({
+      success: true,
+      user,
+      message: "User profile updated successfully."
+    });
+  } catch (error) {
+    console.error("Update User Details Error:", error.message);
+    res.status(500).json({ error: "Failed to update user profile." });
+  }
+};
+
+const toggleUserSuspension = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    // Prevent suspending yourself!
+    if (String(user._id) === String(req.user._id)) {
+      return res.status(400).json({ error: "You cannot suspend your own account." });
+    }
+
+    user.suspended = !user.suspended;
+    await user.save();
+    const { clearUserCache } = require("../middlewares/auth.middleware");
+    clearUserCache(id);
+
+    res.status(200).json({
+      success: true,
+      suspended: user.suspended,
+      message: `User status set to ${user.suspended ? "Suspended" : "Active"}.`
+    });
+  } catch (error) {
+    console.error("Toggle User Suspension Error:", error.message);
+    res.status(500).json({ error: "Failed to toggle user suspension." });
+  }
+};
+
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    const deletedUserEmail = user.email;
+    const loginMethod = user.googleId ? "Google" : "Email";
+
+    // 1. Delete user from database
+    await User.findByIdAndDelete(id);
+
+    // 2. Cascade delete related collections
+    await WatchHistory.deleteMany({ userId: id });
+    await SearchHistory.deleteMany({ userId: id });
+    await Session.deleteMany({ userId: id });
+    await PlayerEvent.deleteMany({ userId: id });
+    if (deletedUserEmail) {
+      await FailedAttempt.deleteMany({ email: deletedUserEmail.toLowerCase() });
+    }
+
+    // 3. Clear user cache
+    const { clearUserCache } = require("../middlewares/auth.middleware");
+    clearUserCache(id);
+
+    // 4. Create Audit Log
+    await AuditLog.create({
+      adminId: req.user._id,
+      adminEmail: req.user.email,
+      deletedUserId: id,
+      deletedUserEmail,
+      loginMethod,
+      timestamp: new Date()
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `User ${deletedUserEmail} and all associated data have been permanently deleted.`
+    });
+  } catch (error) {
+    console.error("Delete User Error:", error.message);
+    res.status(500).json({ error: "Failed to permanently delete user." });
+  }
+};
+
+const getContentRatings = async (req, res) => {
+  try {
+    const { search, page = 1, limit = 20 } = req.query;
+    const query = {};
+
+    if (search) {
+      query.title = { $regex: search, $options: "i" };
+    }
+
+    const currentPage = parseInt(page, 10);
+    const limitVal = parseInt(limit, 10);
+
+    const totalRatings = await Content.countDocuments(query);
+    const ratings = await Content.find(query)
+      .sort({ updatedAt: -1 })
+      .skip((currentPage - 1) * limitVal)
+      .limit(limitVal);
+
+    res.status(200).json({
+      success: true,
+      ratings,
+      pagination: {
+        totalRatings,
+        totalPages: Math.ceil(totalRatings / limitVal),
+        currentPage,
+        limit: limitVal
+      }
+    });
+  } catch (error) {
+    console.error("Get Content Ratings Error:", error.message);
+    res.status(500).json({ error: "Failed to load content ratings." });
+  }
+};
+
+const updateContentRating = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { ageRating } = req.body;
+
+    const validRatings = ["Family", "Teen", "Mature", "Explicit Adult"];
+    if (!validRatings.includes(ageRating)) {
+      return res.status(400).json({ error: "Invalid rating classification." });
+    }
+
+    const content = await Content.findById(id);
+    if (!content) {
+      return res.status(404).json({ error: "Content record not found." });
+    }
+
+    content.ageRating = ageRating;
+    content.isExplicitAdult = (ageRating === "Explicit Adult");
+    content.isAdult = ["Mature", "Explicit Adult"].includes(ageRating);
+
+    await content.save();
+
+    res.status(200).json({
+      success: true,
+      content,
+      message: "Content rating classification updated successfully."
+    });
+  } catch (error) {
+    console.error("Update Content Rating Error:", error.message);
+    res.status(500).json({ error: "Failed to update content rating." });
+  }
+};
+
+const addContentRating = async (req, res) => {
+  try {
+    const { id, type, ageRating } = req.body;
+    if (!id || !type || !ageRating) {
+      return res.status(400).json({ error: "ID, type, and age rating are required." });
+    }
+
+    const validRatings = ["Family", "Teen", "Mature", "Explicit Adult"];
+    if (!validRatings.includes(ageRating)) {
+      return res.status(400).json({ error: "Invalid rating classification." });
+    }
+
+    let content = await Content.findOne({ id, type });
+    if (content) {
+      content.ageRating = ageRating;
+      content.isExplicitAdult = (ageRating === "Explicit Adult");
+      content.isAdult = ["Mature", "Explicit Adult"].includes(ageRating);
+      await content.save();
+      return res.status(200).json({ success: true, content, message: "Content rating updated." });
+    }
+
+    let title = "";
+    let isAdult = false;
+    try {
+      const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+      const apiKey = process.env.TMDB_API_KEY;
+      const actualType = type === "anime" ? "tv" : type;
+      const url = `${TMDB_BASE_URL}/${actualType}/${id}`;
+      const response = await axios.get(url, { params: { api_key: apiKey } });
+      title = response.data.title || response.data.name || "";
+      isAdult = response.data.adult || false;
+    } catch (err) {
+      title = `Content ID ${id}`;
+    }
+
+    content = await Content.create({
+      id,
+      type,
+      title,
+      isAdult: isAdult || ["Mature", "Explicit Adult"].includes(ageRating),
+      isExplicitAdult: (ageRating === "Explicit Adult"),
+      ageRating
+    });
+
+    res.status(201).json({
+      success: true,
+      content,
+      message: "Content rating classification added successfully."
+    });
+  } catch (error) {
+    console.error("Add Content Rating Error:", error.message);
+    res.status(500).json({ error: "Failed to add content rating." });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getUsersList,
@@ -604,5 +895,12 @@ module.exports = {
   toggleTrafficSimulator,
   resetAnalyticsData,
   promoteUserToAdmin,
-  toggleUserPremium
+  toggleUserPremium,
+  getUserDetails,
+  updateUserDetails,
+  toggleUserSuspension,
+  deleteUser,
+  getContentRatings,
+  updateContentRating,
+  addContentRating
 };

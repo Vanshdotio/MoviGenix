@@ -56,6 +56,10 @@ const protect = async (req, res, next) => {
       return res.status(404).json({ error: "User associated with this token not found." });
     }
 
+    if (user.suspended) {
+      return res.status(403).json({ error: "Your account has been suspended. Please contact support." });
+    }
+
     // 5. Attach user to request object
     req.user = user;
     next();
@@ -86,7 +90,11 @@ const optionalProtect = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await getUserFromCacheOrDb(decoded.id);
-    req.user = user || null;
+    if (user && user.suspended) {
+      req.user = null;
+    } else {
+      req.user = user || null;
+    }
     next();
   } catch (error) {
     req.user = null;
@@ -95,11 +103,19 @@ const optionalProtect = async (req, res, next) => {
 };
 
 const adminProtect = (req, res, next) => {
-  if (req.user && req.user.role === "admin") {
+  if (req.user && (req.user.role === "admin" || req.user.role === "superadmin")) {
     next();
   } else {
     return res.status(403).json({ error: "Access denied. Administrator privileges required." });
   }
 };
 
-module.exports = { protect, optionalProtect, adminProtect, clearUserCache };
+const superAdminProtect = (req, res, next) => {
+  if (req.user && req.user.role === "superadmin") {
+    next();
+  } else {
+    return res.status(403).json({ error: "Access denied. Super Administrator privileges required." });
+  }
+};
+
+module.exports = { protect, optionalProtect, adminProtect, superAdminProtect, clearUserCache };

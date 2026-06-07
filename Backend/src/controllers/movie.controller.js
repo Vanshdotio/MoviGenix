@@ -7,9 +7,35 @@ const getApiKey = () => process.env.TMDB_API_KEY;
 
 const ADULT_RATINGS = ["NC-17", "R", "TV-MA", "18", "18+", "R18", "A", "X", "18R", "18TC", "M18"];
 
+const EXPLICIT_RATINGS = ["NC-17", "R18", "X", "18R", "18+"];
+
 const shouldFilter = (user) => {
   if (!user) return true; // Guests default to restricted
   return !user.isAdult || user.safeMode || user.hideMature;
+};
+
+const isExplicitAdultContent = (rating) => {
+  if (!rating) return false;
+  if (rating.isExplicitAdult) return true;
+  if (rating.ageRating && EXPLICIT_RATINGS.includes(String(rating.ageRating).toUpperCase())) {
+    return true;
+  }
+  return false;
+};
+
+const isAccessDenied = (rating, user) => {
+  if (!rating) return false;
+
+  // Rule 1: Strict Explicit Adult restriction (minor/guest blocked)
+  const isExplicit = isExplicitAdultContent(rating);
+  const userAge = user ? user.age : 0;
+  const isMinor = !user || userAge < 18;
+  if (isExplicit && isMinor) return true;
+
+  // Rule 2: General mature content check (safeMode/hideMature)
+  if (rating.isAdult && shouldFilter(user)) return true;
+
+  return false;
 };
 
 const getOrFetchContentRating = async (id, type) => {
@@ -21,6 +47,7 @@ const getOrFetchContentRating = async (id, type) => {
 
   let isAdult = false;
   let ageRating = "G";
+  let title = "";
 
   try {
     if (actualType === "movie") {
@@ -30,6 +57,7 @@ const getOrFetchContentRating = async (id, type) => {
       );
       const movieData = response.data;
       isAdult = movieData.adult || false;
+      title = movieData.title || movieData.original_title || `Movie ID ${id}`;
 
       if (movieData.release_dates && movieData.release_dates.results) {
         const usRelease = movieData.release_dates.results.find((r) => r.iso_3166_1 === "US");
@@ -64,6 +92,7 @@ const getOrFetchContentRating = async (id, type) => {
         getParams({ append_to_response: "content_ratings" })
       );
       const tvData = response.data;
+      title = tvData.name || tvData.original_name || `Show ID ${id}`;
 
       if (tvData.content_ratings && tvData.content_ratings.results) {
         const usRating = tvData.content_ratings.results.find((r) => r.iso_3166_1 === "US");
@@ -93,19 +122,31 @@ const getOrFetchContentRating = async (id, type) => {
     console.error(`Error fetching rating for ${type} ${id}:`, error.message);
   }
 
-  content = await Content.create({ id, type, isAdult, ageRating });
+  const isExplicit = isAdult || (ageRating && EXPLICIT_RATINGS.includes(String(ageRating).toUpperCase()));
+
+  content = await Content.create({ 
+    id, 
+    type, 
+    title, 
+    isAdult: isAdult || isExplicit, 
+    isExplicitAdult: isExplicit, 
+    ageRating 
+  });
   return content;
 };
 
 const filterMediaList = async (items, type, user) => {
   if (!items || items.length === 0) return [];
-  if (!shouldFilter(user)) return minimizeList(items, type);
 
+  // Filter out items marked as adult by TMDB (pornography etc.)
   let filtered = items.filter((item) => !item.adult);
+
+  const userAge = user ? user.age : 0;
+  const isMinor = !user || userAge < 18;
 
   const ids = filtered.map((item) => String(item.id));
   const cachedRatings = await Content.find({ id: { $in: ids } });
-  const cachedMap = new Map(cachedRatings.map((c) => [`${c.type}:${c.id}`, c.isAdult]));
+  const cachedMap = new Map(cachedRatings.map((c) => [`${c.type}:${c.id}`, c]));
 
   const missingItems = [];
   for (const item of filtered) {
@@ -121,9 +162,9 @@ const filterMediaList = async (items, type, user) => {
       missingItems.map(async (m) => {
         try {
           const ratingObj = await getOrFetchContentRating(m.id, m.type);
-          cachedMap.set(`${m.type}:${m.id}`, ratingObj.isAdult);
+          cachedMap.set(`${m.type}:${m.id}`, ratingObj);
         } catch (err) {
-          cachedMap.set(`${m.type}:${m.id}`, false);
+          cachedMap.set(`${m.type}:${m.id}`, { isAdult: false, isExplicitAdult: false, ageRating: "G" });
         }
       })
     );
@@ -131,7 +172,17 @@ const filterMediaList = async (items, type, user) => {
 
   const result = filtered.filter((item) => {
     const itemType = item.media_type || type || "movie";
-    return !cachedMap.get(`${itemType}:${item.id}`);
+    const ratingObj = cachedMap.get(`${itemType}:${item.id}`);
+    if (!ratingObj) return true;
+
+    // Check 1: Strict Explicit Adult restriction (minor/guest blocked)
+    const isExplicit = ratingObj.isExplicitAdult || ["NC-17", "R18", "X", "18R", "18+"].includes(String(ratingObj.ageRating).toUpperCase());
+    if (isExplicit && isMinor) return false;
+
+    // Check 2: General mature content check (safeMode/hideMature)
+    if (ratingObj.isAdult && shouldFilter(user)) return false;
+
+    return true;
   });
 
   return minimizeList(result, type);
@@ -1043,7 +1094,7 @@ const getCartoonDetails = async (req, res) => {
 
     const type = isTv ? "tv" : "movie";
     const rating = await getOrFetchContentRating(id, type);
-    if (rating.isAdult && shouldFilter(req.user)) {
+    if (isAccessDenied(rating, req.user)) {
       return res.status(403).json({ error: "Age Restricted", isAdultContent: true });
     }
 
@@ -1091,7 +1142,7 @@ const getMovieDetails = async (req, res) => {
   try {
     const { id } = req.params;
     const rating = await getOrFetchContentRating(id, "movie");
-    if (rating.isAdult && shouldFilter(req.user)) {
+    if (isAccessDenied(rating, req.user)) {
       return res.status(403).json({ error: "Age Restricted", isAdultContent: true });
     }
 
@@ -1145,7 +1196,7 @@ const getTVDetails = async (req, res) => {
   try {
     const { id } = req.params;
     const rating = await getOrFetchContentRating(id, "tv");
-    if (rating.isAdult && shouldFilter(req.user)) {
+    if (isAccessDenied(rating, req.user)) {
       return res.status(403).json({ error: "Age Restricted", isAdultContent: true });
     }
 
@@ -1199,7 +1250,7 @@ const getTVSeasonDetails = async (req, res) => {
   try {
     const { id, season_number } = req.params;
     const rating = await getOrFetchContentRating(id, "tv");
-    if (rating.isAdult && shouldFilter(req.user)) {
+    if (isAccessDenied(rating, req.user)) {
       return res.status(403).json({ error: "Age Restricted", isAdultContent: true });
     }
 
@@ -1618,8 +1669,7 @@ const getSecureMoviePlayerUrl = async (req, res) => {
     }
 
     const rating = await getOrFetchContentRating(id, "movie");
-    const isUnderage = req.user && req.user.age < 18;
-    if (isUnderage || (rating.isAdult && shouldFilter(req.user))) {
+    if (isAccessDenied(rating, req.user)) {
       return res.status(403).json({ error: "Access denied. This content is age restricted.", isAdultContent: true });
     }
 
@@ -1656,8 +1706,7 @@ const getSecureTVPlayerUrl = async (req, res) => {
     }
 
     const rating = await getOrFetchContentRating(id, "tv");
-    const isUnderage = req.user && req.user.age < 18;
-    if (isUnderage || (rating.isAdult && shouldFilter(req.user))) {
+    if (isAccessDenied(rating, req.user)) {
       return res.status(403).json({ error: "Access denied. This content is age restricted.", isAdultContent: true });
     }
 

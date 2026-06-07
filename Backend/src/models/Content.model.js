@@ -9,15 +9,23 @@ const ContentSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ["movie", "tv", "anime"],
+      enum: ["movie", "tv", "anime", "cartoon"],
+    },
+    title: {
+      type: String,
+      default: "",
     },
     isAdult: {
       type: Boolean,
       default: false,
     },
+    isExplicitAdult: {
+      type: Boolean,
+      default: false,
+    },
     ageRating: {
       type: String,
-      default: "G",
+      default: "G", // Can be "Family", "Teen", "Mature", "Explicit Adult" or standard rating codes
     },
   },
   {

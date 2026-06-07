@@ -64,6 +64,8 @@ const fetchWithRetry = async (
   }
 };
 
+const EXPLICIT_RATINGS = ["NC-17", "R18", "X", "18R", "18+"];
+
 const getOrFetchContentRating = async (id, type) => {
   const actualType = type === "anime" ? "tv" : type;
   let content = await Content.findOne({ id, type });
@@ -73,6 +75,7 @@ const getOrFetchContentRating = async (id, type) => {
 
   let isAdult = false;
   let ageRating = "G";
+  let title = "";
 
   try {
     if (actualType === "movie") {
@@ -82,6 +85,7 @@ const getOrFetchContentRating = async (id, type) => {
       );
       const movieData = response.data;
       isAdult = movieData.adult || false;
+      title = movieData.title || movieData.original_title || `Movie ID ${id}`;
 
       if (movieData.release_dates && movieData.release_dates.results) {
         const usRelease = movieData.release_dates.results.find(
@@ -127,6 +131,7 @@ const getOrFetchContentRating = async (id, type) => {
         getParams({ append_to_response: "content_ratings" }),
       );
       const tvData = response.data;
+      title = tvData.name || tvData.original_name || `Show ID ${id}`;
 
       if (tvData.content_ratings && tvData.content_ratings.results) {
         const usRating = tvData.content_ratings.results.find(
@@ -164,7 +169,16 @@ const getOrFetchContentRating = async (id, type) => {
     console.error(`Error fetching rating for ${type} ${id}:`, error.message);
   }
 
-  content = await Content.create({ id, type, isAdult, ageRating });
+  const isExplicit = isAdult || (ageRating && EXPLICIT_RATINGS.includes(String(ageRating).toUpperCase()));
+
+  content = await Content.create({ 
+    id, 
+    type, 
+    title, 
+    isAdult: isAdult || isExplicit, 
+    isExplicitAdult: isExplicit, 
+    ageRating 
+  });
   return content;
 };
 
@@ -202,15 +216,18 @@ const enrichContinueWatchingLists = async (continueWatching) => {
 const filterUserMediaLists = async (user) => {
   if (!user) return null;
 
-  const shouldFilter = !user.isAdult || user.safeMode || user.hideMature;
+  const userAge = user ? user.age : 0;
+  const isMinor = !user || userAge < 18;
+  const needsFiltering = isMinor || user.safeMode || user.hideMature;
+
   const userObj = user.toObject ? user.toObject() : user;
 
   if (userObj.password) delete userObj.password;
 
   // Computed field: only adults can access content preferences
-  userObj.showContentPreferences = !!userObj.isAdult;
+  userObj.showContentPreferences = user && user.isAdult && user.age >= 18;
 
-  if (!shouldFilter) {
+  if (!needsFiltering) {
     if (userObj.continueWatching) {
       userObj.continueWatching = await enrichContinueWatchingLists(userObj.continueWatching);
     }
@@ -307,7 +324,7 @@ const filterUserMediaLists = async (user) => {
   const ids = uniqueMedia.map((m) => m.id);
   const cached = await Content.find({ id: { $in: ids } });
   const cachedMap = new Map(
-    cached.map((c) => [`${c.type}:${c.id}`, c.isAdult]),
+    cached.map((c) => [`${c.type}:${c.id}`, c]),
   );
 
   const missing = uniqueMedia.filter(
@@ -318,61 +335,74 @@ const filterUserMediaLists = async (user) => {
       missing.map(async (m) => {
         try {
           const content = await getOrFetchContentRating(m.id, m.type);
-          cachedMap.set(`${m.type}:${m.id}`, content.isAdult);
+          cachedMap.set(`${m.type}:${m.id}`, content);
         } catch (err) {
-          cachedMap.set(`${m.type}:${m.id}`, false);
+          cachedMap.set(`${m.type}:${m.id}`, { isAdult: false, isExplicitAdult: false, ageRating: "G" });
         }
       }),
     );
   }
 
+  const checkAccessDenied = (contentObj) => {
+    if (!contentObj) return false;
+    
+    // Rule 1: Explicit Adult check (minors under 18 blocked)
+    const isExplicit = contentObj.isExplicitAdult || ["NC-17", "R18", "X", "18R", "18+"].includes(String(contentObj.ageRating).toUpperCase());
+    if (isExplicit && isMinor) return true;
+
+    // Rule 2: General mature filter check (based on safeMode/hideMature)
+    if (contentObj.isAdult && (user.safeMode || user.hideMature)) return true;
+
+    return false;
+  };
+
   if (userObj.favorites) {
     userObj.favorites = userObj.favorites.filter(
-      (f) => !cachedMap.get(`${f.type}:${f.id}`),
+      (f) => !checkAccessDenied(cachedMap.get(`${f.type}:${f.id}`)),
     );
   }
   if (userObj.watchlist) {
     if (userObj.watchlist.movie) {
       userObj.watchlist.movie = userObj.watchlist.movie.filter(
-        (m) => !cachedMap.get(`movie:${m.id}`),
+        (m) => !checkAccessDenied(cachedMap.get(`movie:${m.id}`)),
       );
     }
     if (userObj.watchlist.cartoon) {
       userObj.watchlist.cartoon = userObj.watchlist.cartoon.filter(
-        (m) => !cachedMap.get(`cartoon:${m.id}`),
+        (m) => !checkAccessDenied(cachedMap.get(`cartoon:${m.id}`)),
       );
     }
     if (userObj.watchlist.tv) {
       userObj.watchlist.tv = userObj.watchlist.tv.filter(
-        (t) => !cachedMap.get(`tv:${t.id}`),
+        (t) => !checkAccessDenied(cachedMap.get(`tv:${t.id}`)),
       );
     }
     if (userObj.watchlist.anime) {
       userObj.watchlist.anime = userObj.watchlist.anime.filter(
-        (a) => !cachedMap.get(`anime:${a.id}`),
+        (a) => !checkAccessDenied(cachedMap.get(`anime:${a.id}`)),
       );
     }
   }
   if (userObj.continueWatching) {
     if (userObj.continueWatching.movie) {
       userObj.continueWatching.movie = userObj.continueWatching.movie.filter(
-        (m) => !cachedMap.get(`movie:${m.movieId || m.id}`),
+        (m) => !checkAccessDenied(cachedMap.get(`movie:${m.movieId || m.id}`)),
       );
     }
     if (userObj.continueWatching.cartoon) {
       userObj.continueWatching.cartoon =
         userObj.continueWatching.cartoon.filter(
-          (m) => !cachedMap.get(`cartoon:${m.cartoonId || m.id}`),
+          (m) => !checkAccessDenied(cachedMap.get(`cartoon:${m.cartoonId || m.id}`)),
         );
     }
     if (userObj.continueWatching.tv) {
       userObj.continueWatching.tv = userObj.continueWatching.tv.filter(
-        (t) => !cachedMap.get(`tv:${t.showId || t.id}`),
+        (t) => !checkAccessDenied(cachedMap.get(`tv:${t.showId || t.id}`)),
       );
     }
     if (userObj.continueWatching.anime) {
       userObj.continueWatching.anime = userObj.continueWatching.anime.filter(
-        (a) => !cachedMap.get(`anime:${a.animeId || a.id}`),
+        (a) => !checkAccessDenied(cachedMap.get(`anime:${a.animeId || a.id}`)),
       );
     }
   }
@@ -488,6 +518,10 @@ const login = async (req, res) => {
     if (!user) {
       await incrementFailedAttempts(req.ip, email, "login");
       return res.status(400).json({ error: "Invalid email or password." });
+    }
+
+    if (user.suspended) {
+      return res.status(403).json({ error: "Your account has been suspended. Please contact support." });
     }
 
     // Google-only users might not have a password
@@ -607,6 +641,10 @@ const googleLogin = async (req, res) => {
       }
     }
 
+    if (user.suspended) {
+      return res.status(403).json({ error: "Your account has been suspended. Please contact support." });
+    }
+
     // Recalculate age on every Google login
     if (user.dob) {
       const currentAge = calculateAge(user.dob);
@@ -706,6 +744,7 @@ const updateProfile = async (req, res) => {
 
     if (name) user.name = name.trim();
     if (avatar) user.avatar = avatar;
+    if (req.body.country) user.country = req.body.country.trim();
     if (preferences) {
       if (preferences.theme) user.preferences.theme = preferences.theme;
       if (preferences.language)

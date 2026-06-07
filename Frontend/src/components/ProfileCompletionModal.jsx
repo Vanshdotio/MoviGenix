@@ -1,14 +1,26 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const ProfileCompletionModal = () => {
   const { user, updateProfile, logout } = useAuth();
   const [dob, setDob] = useState("");
+  const [country, setCountry] = useState("India");
+  const [language, setLanguage] = useState("en");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Only render if user is authenticated but doesn't have a DOB
-  if (!user || user.dob) return null;
+  // Update local state when user shifts/logs in
+  useEffect(() => {
+    if (user) {
+      if (user.dob) setDob(user.dob);
+      if (user.country && user.country !== "Unknown") setCountry(user.country);
+      if (user.preferences?.language) setLanguage(user.preferences.language);
+    }
+  }, [user]);
+
+  // Check if profile is complete (DOB is set, country is set and not "Unknown", language is set)
+  const isProfileComplete = user && user.dob && user.country && user.country !== "Unknown" && user.preferences?.language;
+  if (!user || isProfileComplete) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,6 +28,16 @@ const ProfileCompletionModal = () => {
 
     if (!dob) {
       setErrorMsg("Please select your date of birth.");
+      return;
+    }
+
+    if (!country || country === "Unknown") {
+      setErrorMsg("Please select your region.");
+      return;
+    }
+
+    if (!language) {
+      setErrorMsg("Please select your language preference.");
       return;
     }
 
@@ -29,7 +51,14 @@ const ProfileCompletionModal = () => {
 
     try {
       setLoading(true);
-      await updateProfile({ dob });
+      await updateProfile({
+        dob,
+        country,
+        preferences: {
+          ...user.preferences,
+          language
+        }
+      });
     } catch (err) {
       setErrorMsg(err.message || "Failed to update profile. Please try again.");
     } finally {
@@ -60,7 +89,7 @@ const ProfileCompletionModal = () => {
           COMPLETE PROFILE
         </h2>
         <p className="text-xs text-zinc-400 max-w-xs mx-auto mb-6 leading-relaxed">
-          Please enter your date of birth to finish setting up your account. This secures content filtering for younger users.
+          Please complete onboarding details to set up your fresh account.
         </p>
 
         {/* Error message */}
@@ -72,6 +101,7 @@ const ProfileCompletionModal = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* DOB */}
           <div className="relative text-left">
             <label htmlFor="modal-dob" className="block text-xxs text-zinc-400 mb-1 uppercase tracking-wider pl-1 font-semibold">
               Date of Birth
@@ -84,6 +114,50 @@ const ProfileCompletionModal = () => {
               className="w-full px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/5 focus:border-blue-500 text-white text-sm outline-none transition duration-200 cursor-pointer [color-scheme:dark]"
               required
             />
+          </div>
+
+          {/* Region */}
+          <div className="relative text-left">
+            <label htmlFor="modal-region" className="block text-xxs text-zinc-400 mb-1 uppercase tracking-wider pl-1 font-semibold">
+              Region / Country
+            </label>
+            <select
+              id="modal-region"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/5 focus:border-blue-500 text-white text-sm outline-none transition duration-200 cursor-pointer"
+              required
+            >
+              <option value="India">India</option>
+              <option value="United States">United States</option>
+              <option value="United Kingdom">United Kingdom</option>
+              <option value="Canada">Canada</option>
+              <option value="Germany">Germany</option>
+              <option value="France">France</option>
+              <option value="Australia">Australia</option>
+              <option value="Japan">Japan</option>
+            </select>
+          </div>
+
+          {/* Language Preference */}
+          <div className="relative text-left">
+            <label htmlFor="modal-lang" className="block text-xxs text-zinc-400 mb-1 uppercase tracking-wider pl-1 font-semibold">
+              Preferred Language
+            </label>
+            <select
+              id="modal-lang"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/5 focus:border-blue-500 text-white text-sm outline-none transition duration-200 cursor-pointer"
+              required
+            >
+              <option value="en">English</option>
+              <option value="hi">Hindi</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              <option value="ja">Japanese</option>
+            </select>
           </div>
 
           {/* Action Buttons */}

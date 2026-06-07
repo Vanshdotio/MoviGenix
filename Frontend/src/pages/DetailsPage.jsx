@@ -347,6 +347,7 @@ const DetailsPage = ({ type: propType }) => {
   }
 
   if (error === "restricted") {
+    const isUnderage = user && user.age < 18;
     return (
       <div className="min-h-screen bg-black relative flex items-center justify-center font-[Inter] overflow-hidden text-white px-4">
         {/* Floating Blobs for visual excellence */}
@@ -364,10 +365,13 @@ const DetailsPage = ({ type: propType }) => {
           </div>
           
           <h2 className="text-2xl font-bold font-['ROSSTEN'] tracking-wider text-white mb-2">
-            🔒 AGE RESTRICTED
+            🔒 Age Restricted
           </h2>
           <p className="text-xs text-zinc-400 mb-8 leading-relaxed">
-            This content is rated mature (18+) and is locked. You must be at least 18 years old and have content filters disabled to view this page.
+            {isUnderage
+              ? "This content is available only for users aged 18 or above."
+              : "This content is rated mature (18+) and is locked. You must be at least 18 years old and have content filters disabled to view this page."
+            }
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 text-center justify-center items-center">
@@ -377,12 +381,14 @@ const DetailsPage = ({ type: propType }) => {
             >
               Go Back
             </button>
-            <button
-              onClick={() => navigate("/profile")}
-              className="w-full sm:flex-1 gradient-btn py-3.5 rounded-xl text-white font-semibold text-sm cursor-pointer shadow-lg hover:shadow-blue-500/20 active:scale-[0.98] transition-all duration-200"
-            >
-              Update Profile
-            </button>
+            {!isUnderage && (
+              <button
+                onClick={() => navigate("/profile")}
+                className="w-full sm:flex-1 gradient-btn py-3.5 rounded-xl text-white font-semibold text-sm cursor-pointer shadow-lg hover:shadow-blue-500/20 active:scale-[0.98] transition-all duration-200"
+              >
+                Update Profile
+              </button>
+            )}
           </div>
         </div>
       </div>

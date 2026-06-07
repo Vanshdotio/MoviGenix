@@ -8,6 +8,7 @@ const ForgotPasswordPage = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [errors, setErrors] = useState({});
   const [posters, setPosters] = useState([]);
 
   useEffect(() => {
@@ -33,15 +34,20 @@ const ForgotPasswordPage = () => {
     e.preventDefault();
     setErrorMsg("");
     setSuccessMsg("");
+    setErrors({});
 
+    const newErrors = {};
     if (!email.trim()) {
-      setErrorMsg("Please enter your email address.");
-      return;
+      newErrors.email = "Email is required.";
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.com$/i;
+      if (!emailRegex.test(email)) {
+        newErrors.email = "Please enter a valid email containing '@' and ending with '.com'.";
+      }
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setErrorMsg("Please enter a valid email address.");
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
@@ -57,10 +63,9 @@ const ForgotPasswordPage = () => {
       );
       setEmail("");
     } catch (err) {
-      setErrorMsg(
-        err.response?.data?.error ||
-          "Something went wrong. Please try again."
-      );
+      const errMsg = err.response?.data?.error || "Something went wrong. Please try again.";
+      setErrorMsg(errMsg);
+      setErrors({ email: errMsg });
     } finally {
       setLoading(false);
     }
@@ -125,19 +130,26 @@ const ForgotPasswordPage = () => {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           {/* Email input */}
           <div className="relative">
             <input
               type="email"
               id="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/5 focus:border-blue-500 text-white text-sm placeholder-zinc-500 outline-none transition duration-200"
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errors.email) setErrors(prev => ({ ...prev, email: "" }));
+              }}
+              className={`w-full px-4 py-3 rounded-xl bg-zinc-900/60 border text-white text-sm placeholder-zinc-500 outline-none transition duration-200 ${
+                errors.email ? "border-red-500 focus:border-red-500" : "border-white/5 focus:border-blue-500"
+              }`}
               placeholder="Email Address"
-              required
               disabled={loading}
             />
+            {errors.email && (
+              <p className="text-red-400 text-xs mt-1 pl-1 text-left">{errors.email}</p>
+            )}
           </div>
 
 

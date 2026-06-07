@@ -16,6 +16,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [errors, setErrors] = useState({});
   
   // Background posters state
   const [posters, setPosters] = useState([]);
@@ -44,16 +45,24 @@ const LoginPage = () => {
     e.preventDefault();
     setErrorMsg("");
     setSuccessMsg("");
+    setErrors({});
 
-    // Basic Validations
-    if (!email.trim() || !password) {
-      setErrorMsg("Please enter both email and password.");
-      return;
+    const newErrors = {};
+    if (!email.trim()) {
+      newErrors.email = "Email is required.";
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.com$/i;
+      if (!emailRegex.test(email)) {
+        newErrors.email = "Please enter a valid email containing '@' and ending with '.com'.";
+      }
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setErrorMsg("Please enter a valid email address.");
+    if (!password) {
+      newErrors.password = "Password is required.";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
@@ -62,7 +71,16 @@ const LoginPage = () => {
       await login(email, password, rememberMe);
       navigate("/");
     } catch (err) {
-      setErrorMsg(err.message || "Invalid credentials.");
+      const errMsg = err.message || "Invalid credentials.";
+      setErrorMsg(errMsg);
+      
+      const lowerMsg = errMsg.toLowerCase();
+      if (lowerMsg.includes("email") || lowerMsg.includes("password") || lowerMsg.includes("credential") || lowerMsg.includes("invalid")) {
+        setErrors({
+          email: lowerMsg.includes("email") || lowerMsg.includes("credential") || lowerMsg.includes("invalid") ? errMsg : "",
+          password: lowerMsg.includes("password") || lowerMsg.includes("credential") || lowerMsg.includes("invalid") ? errMsg : ""
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -142,18 +160,25 @@ const LoginPage = () => {
         )}
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           {/* Email input */}
           <div className="relative">
             <input
               type="email"
               id="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/5 focus:border-blue-500 text-white text-sm placeholder-zinc-500 outline-none transition duration-200"
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errors.email) setErrors(prev => ({ ...prev, email: "" }));
+              }}
+              className={`w-full px-4 py-3 rounded-xl bg-zinc-900/60 border text-white text-sm placeholder-zinc-500 outline-none transition duration-200 ${
+                errors.email ? "border-red-500 focus:border-red-500" : "border-white/5 focus:border-blue-500"
+              }`}
               placeholder="Email Address"
-              required
             />
+            {errors.email && (
+              <p className="text-red-400 text-xs mt-1 pl-1 text-left">{errors.email}</p>
+            )}
           </div>
 
           {/* Password input */}
@@ -162,10 +187,14 @@ const LoginPage = () => {
               type={showPassword ? "text" : "password"}
               id="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 pr-12 rounded-xl bg-zinc-900/60 border border-white/5 focus:border-blue-500 text-white text-sm placeholder-zinc-500 outline-none transition duration-200"
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (errors.password) setErrors(prev => ({ ...prev, password: "" }));
+              }}
+              className={`w-full px-4 py-3 pr-12 rounded-xl bg-zinc-900/60 border text-white text-sm placeholder-zinc-500 outline-none transition duration-200 ${
+                errors.password ? "border-red-500 focus:border-red-500" : "border-white/5 focus:border-blue-500"
+              }`}
               placeholder="Password"
-              required
             />
             {/* Show/Hide password toggle */}
             <button
@@ -193,6 +222,9 @@ const LoginPage = () => {
                 </svg>
               )}
             </button>
+            {errors.password && (
+              <p className="text-red-400 text-xs mt-1 pl-1 text-left">{errors.password}</p>
+            )}
           </div>
 
           {/* Remember me & Forgot Password */}
