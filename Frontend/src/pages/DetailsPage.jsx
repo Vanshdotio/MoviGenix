@@ -31,7 +31,7 @@ const DetailsPage = ({ type: propType }) => {
   const type = propType || paramType;
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, toggleFavorite, toggleWatchlist, addContinueWatching, getWatchlist, getContinueWatching } = useAuth();
+  const { user, loading: authLoading, toggleFavorite, toggleWatchlist, addContinueWatching, getWatchlist, getContinueWatching } = useAuth();
   
   const [media, setMedia] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -56,6 +56,7 @@ const DetailsPage = ({ type: propType }) => {
   const isMovie = type === "movie" || (media && !media.seasons);
 
   useEffect(() => {
+    if (authLoading) return;
     const fetchDetails = async () => {
       try {
         setLoading(true);
@@ -68,7 +69,12 @@ const DetailsPage = ({ type: propType }) => {
       } catch (err) {
         console.error("Error fetching media details:", err);
         if (err.response && err.response.status === 403) {
-          setError("restricted");
+          if (!user) {
+            const currentPath = location.pathname + location.search;
+            navigate(`/login?redirect=${encodeURIComponent(currentPath)}`);
+          } else {
+            setError("restricted");
+          }
         } else {
           setError("Failed to load details. Please try again.");
         }
@@ -79,7 +85,7 @@ const DetailsPage = ({ type: propType }) => {
 
     fetchDetails();
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [apiType, id]);
+  }, [apiType, id, authLoading, user, location.pathname, location.search, navigate]);
 
   // Autoplay trigger
   useEffect(() => {
@@ -338,7 +344,7 @@ const DetailsPage = ({ type: propType }) => {
 
   const nextEpisode = getNextEpisodeInfo();
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader />
@@ -381,14 +387,12 @@ const DetailsPage = ({ type: propType }) => {
             >
               Go Back
             </button>
-            {!isUnderage && (
-              <button
-                onClick={() => navigate("/profile")}
-                className="w-full sm:flex-1 gradient-btn py-3.5 rounded-xl text-white font-semibold text-sm cursor-pointer shadow-lg hover:shadow-blue-500/20 active:scale-[0.98] transition-all duration-200"
-              >
-                Update Profile
-              </button>
-            )}
+            <button
+              onClick={() => navigate("/profile")}
+              className="w-full sm:flex-1 gradient-btn py-3.5 rounded-xl text-white font-semibold text-sm cursor-pointer shadow-lg hover:shadow-blue-500/20 active:scale-[0.98] transition-all duration-200"
+            >
+              Update Profile
+            </button>
           </div>
         </div>
       </div>

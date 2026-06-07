@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../context/AuthContext";
 import { getPopularMovies } from "../services/api";
 
 const SignupPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signup, googleLogin } = useAuth();
+
+  const queryParams = new URLSearchParams(location.search);
+  const redirectUrl = queryParams.get("redirect") || "/";
+  const hasRedirect = !!queryParams.get("redirect");
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -95,7 +100,7 @@ const SignupPage = () => {
     try {
       setLoading(true);
       await signup(name, email, password, confirmPassword, dob);
-      navigate("/");
+      navigate(redirectUrl);
     } catch (err) {
       const errMsg = err.message || "Failed to create account.";
       setErrorMsg(errMsg);
@@ -126,7 +131,7 @@ const SignupPage = () => {
     try {
       setLoading(true);
       await googleLogin(credentialResponse.credential);
-      navigate("/");
+      navigate(redirectUrl);
     } catch (err) {
       setErrorMsg(err.message || "Google authentication failed.");
       setLoading(false);
@@ -171,12 +176,36 @@ const SignupPage = () => {
               className="h-12 w-12 mx-auto mb-4 cursor-pointer object-contain"
             />
           </Link>
-          <h2 className="text-2xl font-bold font-['ROSSTEN'] tracking-wider text-white">
-            CREATE ACCOUNT
-          </h2>
-          <p className="text-xs text-zinc-400 mt-1">
-            Join now to get personalized recommendations.
-          </p>
+          {hasRedirect ? (
+            <>
+              <p className="text-sm text-zinc-300 font-medium mb-4 animate-fade-in">
+                Please sign in to continue watching.
+              </p>
+              <div className="flex bg-zinc-900/80 p-1 rounded-xl border border-white/5 mb-6">
+                <Link
+                  to={`/login?redirect=${encodeURIComponent(redirectUrl)}`}
+                  className="flex-1 py-2 rounded-lg text-zinc-400 font-semibold text-xs hover:text-white transition duration-200 flex items-center justify-center"
+                >
+                  Sign In
+                </Link>
+                <button
+                  type="button"
+                  className="flex-1 py-2 rounded-lg bg-zinc-800 border border-white/5 text-white font-semibold text-xs shadow-md transition duration-200 cursor-default"
+                >
+                  Create Account
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl font-bold font-['ROSSTEN'] tracking-wider text-white">
+                CREATE ACCOUNT
+              </h2>
+              <p className="text-xs text-zinc-400 mt-1">
+                Join now to get personalized recommendations.
+              </p>
+            </>
+          )}
         </div>
 
         {/* Error message banner */}
@@ -365,7 +394,7 @@ const SignupPage = () => {
         <p className="text-center text-xs text-zinc-500 mt-6">
           Already have an account?{" "}
           <Link
-            to="/login"
+            to={hasRedirect ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"}
             className="text-white hover:text-yellow-400 font-semibold transition duration-200"
           >
             Sign in

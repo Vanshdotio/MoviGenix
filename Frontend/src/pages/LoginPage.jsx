@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../context/AuthContext";
 import { getPopularMovies } from "../services/api";
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, googleLogin } = useAuth();
+
+  const queryParams = new URLSearchParams(location.search);
+  const redirectUrl = queryParams.get("redirect") || "/";
+  const hasRedirect = !!queryParams.get("redirect");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -69,7 +74,7 @@ const LoginPage = () => {
     try {
       setLoading(true);
       await login(email, password, rememberMe);
-      navigate("/");
+      navigate(redirectUrl);
     } catch (err) {
       const errMsg = err.message || "Invalid credentials.";
       setErrorMsg(errMsg);
@@ -93,7 +98,7 @@ const LoginPage = () => {
     try {
       setLoading(true);
       await googleLogin(credentialResponse.credential);
-      navigate("/");
+      navigate(redirectUrl);
     } catch (err) {
       setErrorMsg(err.message || "Google authentication failed.");
       setLoading(false);
@@ -138,12 +143,36 @@ const LoginPage = () => {
               className="h-12 w-12 mx-auto mb-4 cursor-pointer object-contain"
             />
           </Link>
-          <h2 className="text-2xl font-bold font-['ROSSTEN'] tracking-wider text-white">
-            WELCOME BACK
-          </h2>
-          <p className="text-xs text-zinc-400 mt-1">
-            Access your custom recommendations and watchlist.
-          </p>
+          {hasRedirect ? (
+            <>
+              <p className="text-sm text-zinc-300 font-medium mb-4 animate-fade-in">
+                Please sign in to continue watching.
+              </p>
+              <div className="flex bg-zinc-900/80 p-1 rounded-xl border border-white/5 mb-6">
+                <button
+                  type="button"
+                  className="flex-1 py-2 rounded-lg bg-zinc-800 border border-white/5 text-white font-semibold text-xs shadow-md transition duration-200 cursor-default"
+                >
+                  Sign In
+                </button>
+                <Link
+                  to={`/signup?redirect=${encodeURIComponent(redirectUrl)}`}
+                  className="flex-1 py-2 rounded-lg text-zinc-400 font-semibold text-xs hover:text-white transition duration-200 flex items-center justify-center"
+                >
+                  Create Account
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl font-bold font-['ROSSTEN'] tracking-wider text-white">
+                WELCOME BACK
+              </h2>
+              <p className="text-xs text-zinc-400 mt-1">
+                Access your custom recommendations and watchlist.
+              </p>
+            </>
+          )}
         </div>
 
         {/* Message banners */}
@@ -287,7 +316,7 @@ const LoginPage = () => {
         <p className="text-center text-xs text-zinc-500 mt-8">
           New to Movigenix?{" "}
           <Link
-            to="/signup"
+            to={hasRedirect ? `/signup?redirect=${encodeURIComponent(redirectUrl)}` : "/signup"}
             className="text-white hover:text-yellow-400 font-semibold transition duration-200"
           >
             Sign up now
