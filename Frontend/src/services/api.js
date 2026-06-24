@@ -642,4 +642,38 @@ export const getTVShowList = async (category, page = 1) => {
   return response.data;
 };
 
+// ==========================================
+// UPCOMING CONTENT ENDPOINTS
+// ==========================================
+
+export const getUpcomingTV = async (page = 1) => {
+  const response = await apiClient.get("/tv/upcoming", { params: { page } });
+  return response.data;
+};
+
+export const getUpcomingWebSeries = async (page = 1) => {
+  const response = await apiClient.get("/web-series/upcoming", { params: { page } });
+  return response.data;
+};
+
+export const getUpcomingCartoons = async (page = 1) => {
+  const response = await apiClient.get("/cartoon/upcoming", { params: { page } });
+  return response.data;
+};
+
+// ==========================================
+// NOTIFY ME ENDPOINTS
+// ==========================================
+
+export const toggleNotifyMeApi = async ({ contentId, contentType, title, releaseDate }) => {
+  const response = await authClient.post("/notify-me", { contentId, contentType, title, releaseDate });
+  return response.data;
+};
+
+export const getNotifyMeListApi = async () => {
+  const response = await authClient.get("/notify-me");
+  return response.data;
+};
+
 export default apiClient;
+

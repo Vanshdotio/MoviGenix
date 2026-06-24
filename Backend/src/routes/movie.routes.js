@@ -85,6 +85,10 @@ const {
   getSecureTVPlayerUrl,
   // Audio Languages
   getAvailableLanguages,
+  // Upcoming Content Endpoints
+  getUpcomingTV,
+  getUpcomingWebSeries,
+  getUpcomingCartoons,
 } = require("../controllers/movie.controller");
 
 const { cacheMiddleware } = require("../utils/cache");
@@ -182,7 +186,12 @@ router.get("/because-you-watched", optionalProtect, cacheMiddleware(60), getBeca
 // Web Series Routes
 router.get("/web-series", cacheMiddleware(300), getWebSeriesList);
 router.get("/web-series/recommendations", optionalProtect, cacheMiddleware(60), getWebSeriesRecommendations);
+router.get("/web-series/upcoming", cacheMiddleware(300), getUpcomingWebSeries);
 router.get("/discover/web-series", cacheMiddleware(300), getWebSeriesList);
 router.get("/search/web-series", searchWebSeries);
+
+// Additional Upcoming Routes
+router.get("/tv/upcoming", cacheMiddleware(300), getUpcomingTV);
+router.get("/cartoon/upcoming", cacheMiddleware(300), getUpcomingCartoons);
 
 module.exports = router;

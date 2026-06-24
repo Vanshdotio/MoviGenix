@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
 const User = require("../models/User.model");
 const Content = require("../models/Content.model");
+const Notification = require("../models/Notification.model");
 const { clearUserCache } = require("../middlewares/auth.middleware");
 const { getMediaMinimalDetails } = require("./movie.controller");
 const axios = require("axios");
@@ -1222,6 +1223,59 @@ const forgotPassword = async (req, res) => {
   }
 };
 
+/**
+ * Toggle a "Notify Me" subscription for upcoming content.
+ * POST /api/auth/notify-me
+ * Body: { contentId, contentType, title, releaseDate }
+ */
+const toggleNotifyMe = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { contentId, contentType, title, releaseDate } = req.body;
+
+    if (!contentId || !contentType) {
+      return res.status(400).json({ error: "contentId and contentType are required" });
+    }
+
+    const existing = await Notification.findOne({ userId, contentId });
+
+    if (existing) {
+      // Already subscribed — remove (toggle off)
+      await Notification.deleteOne({ userId, contentId });
+      return res.json({ subscribed: false, message: "Notification removed" });
+    } else {
+      // Subscribe
+      await Notification.create({
+        userId,
+        contentId: String(contentId),
+        contentType,
+        title: title || "",
+        releaseDate: releaseDate || "",
+        notified: false,
+      });
+      return res.json({ subscribed: true, message: "Notification added" });
+    }
+  } catch (error) {
+    console.error("Toggle Notify Me Error:", error.message);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
+/**
+ * Get all notify-me subscriptions for the current user.
+ * GET /api/auth/notify-me
+ */
+const getNotifyMeList = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const notifications = await Notification.find({ userId }).select("contentId contentType title releaseDate notified");
+    return res.json({ notifications });
+  } catch (error) {
+    console.error("Get Notify Me List Error:", error.message);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
 module.exports = {
   signup,
   login,
@@ -1234,4 +1288,6 @@ module.exports = {
   addContinueWatching,
   removeContinueWatching,
   forgotPassword,
+  toggleNotifyMe,
+  getNotifyMeList,
 };

@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useRef, Suspense } from "react";
+﻿import React, { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { getMediaDetails, getTVSeasonDetails } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { isUpcomingContent, formatReleaseDate, getCountdownDays, getCountdownLabel } from "../utils/releaseUtils";
 const VideoPlayer = React.lazy(() => import("../components/VideoPlayer"));
 import Loader from "../components/Loader";
 import MediaSlider from "../components/MediaSlider";
@@ -31,7 +32,7 @@ const DetailsPage = ({ type: propType }) => {
   const type = propType || paramType;
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading: authLoading, toggleFavorite, toggleWatchlist, addContinueWatching, getWatchlist, getContinueWatching } = useAuth();
+  const { user, loading: authLoading, toggleFavorite, toggleWatchlist, toggleNotifyMe, isNotifiedFor, addContinueWatching, getWatchlist, getContinueWatching } = useAuth();
   
   const [media, setMedia] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -195,6 +196,10 @@ const DetailsPage = ({ type: propType }) => {
   const startPlayback = (item, forceStartFromBeginning = false) => {
     if (!user) {
       navigate("/login");
+      return;
+    }
+    // Release gate: block playback for upcoming (unreleased) content
+    if (isUpcomingContent(media)) {
       return;
     }
     // Initialize playback time
@@ -371,7 +376,7 @@ const DetailsPage = ({ type: propType }) => {
           </div>
           
           <h2 className="text-2xl font-bold font-['ROSSTEN'] tracking-wider text-white mb-2">
-            🔒 Age Restricted
+            ðŸ”’ Age Restricted
           </h2>
           <p className="text-xs text-zinc-400 mb-8 leading-relaxed">
             {isUnderage
@@ -418,6 +423,23 @@ const DetailsPage = ({ type: propType }) => {
   const overview = media.overview;
   const rating = media.vote_average ? media.vote_average.toFixed(1) : "N/A";
   const releaseDate = media.release_date || media.first_air_date || "";
+
+  // Release gate
+  const upcoming = isUpcomingContent(media);
+  const isNotified = isNotifiedFor ? isNotifiedFor(String(id)) : false;
+
+  const handleNotifyMeClick = () => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    toggleNotifyMe({
+      contentId: String(id),
+      contentType: type,
+      title: media.title || media.name,
+      releaseDate: media.release_date || media.first_air_date,
+    });
+  };
   const genres = media.genres || [];
   const runtime = media.runtime; // For movie
   const posterPath = media.poster_path;
@@ -491,13 +513,19 @@ const DetailsPage = ({ type: propType }) => {
 
           <div className="col-span-1 md:col-span-3 flex flex-col items-start gap-4">
             <div className="flex flex-wrap items-center gap-3 text-xs md:text-sm font-medium text-gray-300">
-              <span className="bg-yellow-400 text-black font-bold px-2 py-0.5 rounded text-xs uppercase">
-                {type === "anime" ? "Anime" : type === "cartoon" ? "Cartoon" : type === "tv" ? "TV Show" : type === "web-series" ? "Web Series" : "Movie"}
-              </span>
+              {upcoming ? (
+                <span className="bg-violet-600 text-white font-bold px-2 py-0.5 rounded text-xs uppercase">
+                  Upcoming
+                </span>
+              ) : (
+                <span className="bg-yellow-400 text-black font-bold px-2 py-0.5 rounded text-xs uppercase">
+                  {type === "anime" ? "Anime" : type === "cartoon" ? "Cartoon" : type === "tv" ? "TV Show" : type === "web-series" ? "Web Series" : "Movie"}
+                </span>
+              )}
               {releaseDate && <span>{releaseDate.slice(0, 4)}</span>}
               {isMovie && runtime && (
                 <>
-                  <span>•</span>
+                  <span>â€¢</span>
                   <span>{formatRuntime(runtime)}</span>
                 </>
               )}
@@ -535,116 +563,174 @@ const DetailsPage = ({ type: propType }) => {
               </div>
 
               <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                {/* Play Buttons: Watch Now & Resume/Continue Watching */}
-                {isMovie ? (
+                {/* Play / Upcoming CTA buttons */}
+                {upcoming ? (
+                  /* ===== UPCOMING CONTENT UI ===== */
                   <>
+                    {/* Release date & countdown */}
+                    <div className="flex flex-col gap-1 mb-1 w-full">
+                      <div className="flex items-center gap-2 bg-violet-600/10 border border-violet-500/30 rounded-lg px-4 py-2.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-violet-400 shrink-0">
+                          <path d="M17 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H7V1H9V3H15V1H17V3ZM19 11H5V19H19V11ZM15 3H9V5H15V3ZM4 9H20V5H4V9Z" />
+                        </svg>
+                        <div>
+                          <p className="text-[11px] text-violet-400 font-semibold uppercase tracking-wider">Release Date</p>
+                          <p className="text-white font-bold text-sm">{formatReleaseDate(releaseDate)}</p>
+                        </div>
+                        <span className="ml-auto bg-violet-600/30 text-violet-300 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-violet-500/40">
+                          {getCountdownLabel(media)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Notify Me button */}
                     <button
-                      onClick={() => startPlayback({ type: type, title, duration: (runtime || 120) * 60 }, true)}
-                      className="bg-white/10 hover:bg-white/20 border border-white/10 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                      onClick={handleNotifyMeClick}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-lg border text-xs font-semibold backdrop-blur-sm transition cursor-pointer ${
+                        isNotified
+                          ? "bg-violet-600/20 border-violet-500 text-violet-300"
+                          : "bg-violet-600 border-violet-600 text-white hover:bg-violet-500"
+                      }`}
+                      title={isNotified ? "Remove notification" : "Notify me when released"}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                        <path d="M8 5V19L19 12L8 5Z" />
+                        <path d="M20 17H22V19H2V17H4V10C4 5.58172 7.58172 2 12 2C16.4183 2 20 5.58172 20 10V17ZM18 17V10C18 6.68629 15.3137 4 12 4C8.68629 4 6 6.68629 6 10V17H18ZM9 21H15V23H9V21Z" />
                       </svg>
-                      Watch Now
+                      {isNotified ? "Notified âœ“" : "Notify Me"}
                     </button>
 
-                    {currentContinueItem && currentContinueItem.progress > 0 && (
+                    {/* Watchlist button */}
+                    <button
+                      onClick={handleWatchlistClick}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold backdrop-blur-sm transition cursor-pointer ${
+                        isWatchlisted
+                          ? "bg-yellow-400/10 border-yellow-400 text-yellow-400"
+                          : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/15"
+                      }`}
+                      title={isWatchlisted ? "Remove from Watchlist" : "Add to Watchlist"}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={isWatchlisted ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                        <path d="M5 3H19C20.1046 3 21 3.89543 21 5V21L12 17L3 21V5C3 3.89543 3.89543 3 5 3Z"></path>
+                      </svg>
+                      {isWatchlisted ? "In Watchlist" : "Watchlist"}
+                    </button>
+
+                    {/* Trailer button (only if trailerKey exists) */}
+                    {trailerKey && (
                       <button
-                        onClick={() => startPlayback({ type: type, title, duration: (runtime || 120) * 60 })}
-                        className="gradient-btn text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all shadow-lg hover:shadow-blue-500/20 cursor-pointer"
+                        onClick={() => setLoadTrailer(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-gray-300 hover:bg-white/15 text-xs font-semibold backdrop-blur-sm transition cursor-pointer"
+                        title="Watch Trailer"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                          <path d="M8 5V19L19 12L8 5Z" />
+                          <path d="M2 3.9934C2 3.44476 2.45531 3 2.9918 3H21.0082C21.556 3 22 3.44495 22 3.9934V20.0066C22 20.5552 21.5447 21 21.0082 21H2.9918C2.44405 21 2 20.5551 2 20.0066V3.9934ZM8 7V17L16 12L8 7Z" />
                         </svg>
-                        Resume Watching ({formatTime(currentContinueItem.progress)})
+                        Watch Trailer
                       </button>
                     )}
                   </>
                 ) : (
+                  /* ===== RELEASED CONTENT UI ===== */
                   <>
+                    {isMovie ? (
+                      <>
+                        <button
+                          onClick={() => startPlayback({ type: type, title, duration: (runtime || 120) * 60 }, true)}
+                          className="bg-white/10 hover:bg-white/20 border border-white/10 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                            <path d="M8 5V19L19 12L8 5Z" />
+                          </svg>
+                          Watch Now
+                        </button>
+
+                        {currentContinueItem && currentContinueItem.progress > 0 && (
+                          <button
+                            onClick={() => startPlayback({ type: type, title, duration: (runtime || 120) * 60 })}
+                            className="gradient-btn text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all shadow-lg hover:shadow-blue-500/20 cursor-pointer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                              <path d="M8 5V19L19 12L8 5Z" />
+                            </svg>
+                            Resume Watching ({formatTime(currentContinueItem.progress)})
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() =>
+                            startPlayback({
+                              type,
+                              season: 1,
+                              episode: 1,
+                              title: `S1E1`,
+                              duration: type === "anime" ? 1440 : 2700,
+                            }, true)
+                          }
+                          className="bg-white/10 hover:bg-white/20 border border-white/10 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                            <path d="M8 5V19L19 12L8 5Z" />
+                          </svg>
+                          Play Episode
+                        </button>
+
+                        {currentContinueItem && (
+                          <button
+                            onClick={() =>
+                              startPlayback({
+                                type,
+                                season: currentContinueItem.season || 1,
+                                episode: currentContinueItem.episode || 1,
+                                title: `S${currentContinueItem.season}E${currentContinueItem.episode}`,
+                                duration: currentContinueItem.duration || (type === "anime" ? 1440 : 2700),
+                              })
+                            }
+                            className="gradient-btn text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all shadow-lg hover:shadow-blue-500/20 cursor-pointer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                              <path d="M8 5V19L19 12L8 5Z" />
+                            </svg>
+                            Continue Episode S{currentContinueItem.season}E{currentContinueItem.episode}
+                          </button>
+                        )}
+                      </>
+                    )}
+
+                    {/* Watchlist button (released) */}
                     <button
-                      onClick={() =>
-                        startPlayback({
-                          type,
-                          season: 1,
-                          episode: 1,
-                          title: `S1E1`,
-                          duration: type === "anime" ? 1440 : 2700,
-                        }, true)
-                      }
-                      className="bg-white/10 hover:bg-white/20 border border-white/10 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                      onClick={handleWatchlistClick}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold backdrop-blur-sm transition cursor-pointer ${
+                        isWatchlisted
+                          ? "bg-yellow-400/10 border-yellow-400 text-yellow-400"
+                          : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/15"
+                      }`}
+                      title={isWatchlisted ? "Remove from Watchlist" : "Add to Watchlist"}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                        <path d="M8 5V19L19 12L8 5Z" />
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={isWatchlisted ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                        <path d="M5 3H19C20.1046 3 21 3.89543 21 5V21L12 17L3 21V5C3 3.89543 3.89543 3 5 3Z"></path>
                       </svg>
-                      Play Episode
+                      {isWatchlisted ? "In Watchlist" : "Watchlist"}
                     </button>
 
-                    {currentContinueItem && (
-                      <button
-                        onClick={() =>
-                          startPlayback({
-                            type,
-                            season: currentContinueItem.season || 1,
-                            episode: currentContinueItem.episode || 1,
-                            title: `S${currentContinueItem.season}E${currentContinueItem.episode}`,
-                            duration: currentContinueItem.duration || (type === "anime" ? 1440 : 2700),
-                          })
-                        }
-                        className="gradient-btn text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all shadow-lg hover:shadow-blue-500/20 cursor-pointer"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                          <path d="M8 5V19L19 12L8 5Z" />
-                        </svg>
-                        Continue Episode S{currentContinueItem.season}E{currentContinueItem.episode}
-                      </button>
-                    )}
+                    {/* Favorite button (released) */}
+                    <button
+                      onClick={handleFavoriteClick}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold backdrop-blur-sm transition cursor-pointer ${
+                        isFavorite
+                          ? "bg-red-500/10 border-red-500 text-red-500"
+                          : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/15"
+                      }`}
+                      title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={isFavorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                        <path d="M12.001 4.52853C14.35 2.42 17.98 2.49 20.2426 4.75736C22.5053 7.02472 22.583 10.6373 20.4786 12.993L12.0014 21.485L3.52138 12.993C1.41705 10.6373 1.49471 7.01901 3.75736 4.75736C6.02002 2.49571 9.6531 2.41165 12.001 4.52853Z"></path>
+                      </svg>
+                      {isFavorite ? "Favorited" : "Favorite"}
+                    </button>
                   </>
                 )}
-
-                <button
-                  onClick={handleWatchlistClick}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold backdrop-blur-sm transition cursor-pointer ${
-                    isWatchlisted
-                      ? "bg-yellow-400/10 border-yellow-400 text-yellow-400"
-                      : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/15"
-                  }`}
-                  title={isWatchlisted ? "Remove from Watchlist" : "Add to Watchlist"}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill={isWatchlisted ? "currentColor" : "none"}
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="w-4 h-4"
-                  >
-                    <path d="M5 3H19C20.1046 3 21 3.89543 21 5V21L12 17L3 21V5C3 3.89543 3.89543 3 5 3Z"></path>
-                  </svg>
-                  {isWatchlisted ? "In Watchlist" : "Watchlist"}
-                </button>
-
-                <button
-                  onClick={handleFavoriteClick}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold backdrop-blur-sm transition cursor-pointer ${
-                    isFavorite
-                      ? "bg-red-500/10 border-red-500 text-red-500"
-                      : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/15"
-                  }`}
-                  title={isFavorite ? "Remove from Favorites" : "Add to Favorites"}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill={isFavorite ? "currentColor" : "none"}
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="w-4 h-4"
-                  >
-                    <path d="M12.001 4.52853C14.35 2.42 17.98 2.49 20.2426 4.75736C22.5053 7.02472 22.583 10.6373 20.4786 12.993L12.0014 21.485L3.52138 12.993C1.41705 10.6373 1.49471 7.01901 3.75736 4.75736C6.02002 2.49571 9.6531 2.41165 12.001 4.52853Z"></path>
-                  </svg>
-                  {isFavorite ? "Favorited" : "Favorite"}
-                </button>
               </div>
             </div>
 
@@ -746,7 +832,7 @@ const DetailsPage = ({ type: propType }) => {
                             : "bg-white/5 border-white/10 text-zinc-300"
                         }`}
                       >
-                        🎧 {lang.english_name || lang.name || lang.iso_639_1}
+                        ðŸŽ§ {lang.english_name || lang.name || lang.iso_639_1}
                         {isOriginal && <span className="ml-1 opacity-60">(Original)</span>}
                       </span>
                     );
@@ -977,7 +1063,7 @@ const DetailsPage = ({ type: propType }) => {
                               {season.name}
                             </h3>
                             <p className="text-xs text-yellow-400 font-medium mt-0.5">
-                              {season.episode_count} Episodes •{" "}
+                              {season.episode_count} Episodes â€¢{" "}
                               {season.air_date ? season.air_date.slice(0, 4) : "TBA"}
                             </p>
                           </div>
@@ -1077,7 +1163,7 @@ const DetailsPage = ({ type: propType }) => {
                                         )}
                                         {episode.runtime && (
                                           <>
-                                            <span className="text-gray-700">•</span>
+                                            <span className="text-gray-700">â€¢</span>
                                             <span>{episode.runtime}m</span>
                                           </>
                                         )}

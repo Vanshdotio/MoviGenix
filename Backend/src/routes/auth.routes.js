@@ -13,6 +13,8 @@ const {
   addContinueWatching,
   removeContinueWatching,
   forgotPassword,
+  toggleNotifyMe,
+  getNotifyMeList,
 } = require("../controllers/auth.controller");
 
 // Public auth routes
@@ -29,5 +31,9 @@ router.post("/favorites/toggle", protect, toggleFavorite);
 router.post("/watchlist/toggle", protect, toggleWatchlist);
 router.post("/continue-watching", protect, addContinueWatching);
 router.post("/continue-watching/remove", protect, removeContinueWatching);
+
+// Notify Me routes
+router.post("/notify-me", protect, toggleNotifyMe);
+router.get("/notify-me", protect, getNotifyMeList);
 
 module.exports = router;

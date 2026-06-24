@@ -10,6 +10,8 @@ import {
   toggleWatchlistApi,
   addContinueWatchingApi,
   removeContinueWatchingApi,
+  toggleNotifyMeApi,
+  getNotifyMeListApi,
   authClient,
   default as apiClient
 } from "../services/api";
@@ -20,6 +22,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [notifyMeList, setNotifyMeList] = useState([]); // [{contentId, contentType, ...}]
 
   const [guestPreferences, setGuestPreferences] = useState(() => {
     const saved = localStorage.getItem("guestPreferences");
@@ -68,6 +71,13 @@ export const AuthProvider = ({ children }) => {
       const data = await getUserProfile();
       if (data && data.user) {
         setUser(data.user);
+        // Load notify-me list after login
+        try {
+          const notifData = await getNotifyMeListApi();
+          setNotifyMeList(notifData.notifications || []);
+        } catch (_) {
+          // ignore — user may not be logged in yet
+        }
       }
     } catch (err) {
       console.log("No active user session found.");
@@ -244,6 +254,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const toggleNotifyMe = async ({ contentId, contentType, title, releaseDate }) => {
+    if (!user) return false;
+    try {
+      const res = await toggleNotifyMeApi({ contentId, contentType, title, releaseDate });
+      if (res.subscribed) {
+        setNotifyMeList((prev) => [...prev, { contentId, contentType, title, releaseDate }]);
+      } else {
+        setNotifyMeList((prev) => prev.filter((n) => n.contentId !== contentId));
+      }
+      return res.subscribed;
+    } catch (err) {
+      console.error("Failed to toggle notify me:", err.message);
+      return false;
+    }
+  };
+
+  const isNotifiedFor = (contentId) => {
+    return notifyMeList.some((n) => String(n.contentId) === String(contentId));
+  };
+
   const getWatchlist = (type) => {
     if (!user || !user.watchlist) return [];
     const key = type === "web-series" ? "webSeries" : type;
@@ -271,6 +301,9 @@ export const AuthProvider = ({ children }) => {
     removeContinueWatching,
     getWatchlist,
     getContinueWatching,
+    toggleNotifyMe,
+    isNotifiedFor,
+    notifyMeList,
     isAuthenticated: !!user,
     contentPreferences,
     updateContentPreferences,

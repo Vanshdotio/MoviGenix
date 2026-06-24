@@ -2184,6 +2184,81 @@ const getWebSeriesRecommendations = async (req, res) => {
   }
 };
 
+/**
+ * GET /tv/upcoming
+ * Traditional TV shows airing in the future (non-OTT, broadcast channels)
+ */
+const getUpcomingTV = async (req, res) => {
+  try {
+    const { page = 1 } = req.query;
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const params = getParams({
+      "first_air_date.gte": today,
+      sort_by: "first_air_date.asc",
+      without_networks: OTT_NETWORKS_COMMA,
+      without_genres: "16", // exclude animation
+      page,
+    });
+    const response = await fetchWithRetry(`${TMDB_BASE_URL}/discover/tv`, params);
+    const items = response.data.results || [];
+    const filtered = await filterMediaList(items, "tv", req.user);
+    return res.json({ results: filtered, page: response.data.page, total_pages: response.data.total_pages });
+  } catch (err) {
+    console.error("getUpcomingTV error:", err.message);
+    return res.status(500).json({ error: "Failed to fetch upcoming TV shows" });
+  }
+};
+
+/**
+ * GET /web-series/upcoming
+ * OTT Web Series releasing in the future
+ */
+const getUpcomingWebSeries = async (req, res) => {
+  try {
+    const { page = 1 } = req.query;
+    const today = new Date().toISOString().split("T")[0];
+    const params = getParams({
+      "first_air_date.gte": today,
+      sort_by: "first_air_date.asc",
+      with_networks: OTT_NETWORKS_COMMA,
+      without_genres: "16", // exclude animation
+      page,
+    });
+    const response = await fetchWithRetry(`${TMDB_BASE_URL}/discover/tv`, params);
+    const items = response.data.results || [];
+    const filtered = await filterMediaList(items, "tv", req.user);
+    return res.json({ results: filtered, page: response.data.page, total_pages: response.data.total_pages });
+  } catch (err) {
+    console.error("getUpcomingWebSeries error:", err.message);
+    return res.status(500).json({ error: "Failed to fetch upcoming web series" });
+  }
+};
+
+/**
+ * GET /cartoon/upcoming
+ * Upcoming animated/cartoon shows (non-anime)
+ */
+const getUpcomingCartoons = async (req, res) => {
+  try {
+    const { page = 1 } = req.query;
+    const today = new Date().toISOString().split("T")[0];
+    const params = getParams({
+      with_genres: "16",
+      "first_air_date.gte": today,
+      sort_by: "first_air_date.asc",
+      without_original_language: "ja",
+      page,
+    });
+    const response = await fetchWithRetry(`${TMDB_BASE_URL}/discover/tv`, params);
+    const items = filterCartoons(response.data.results || []);
+    const filtered = await filterMediaList(items, "tv", req.user);
+    return res.json({ results: filtered, page: response.data.page, total_pages: response.data.total_pages });
+  } catch (err) {
+    console.error("getUpcomingCartoons error:", err.message);
+    return res.status(500).json({ error: "Failed to fetch upcoming cartoons" });
+  }
+};
+
 module.exports = {
   getBollywoodMovies,
   getTollywoodMovies,
@@ -2265,6 +2340,10 @@ module.exports = {
   getTVNewEpisodes,
   getAnimeNewlyAdded,
   getAnimeCollection,
+  // Upcoming Content Endpoints
+  getUpcomingTV,
+  getUpcomingWebSeries,
+  getUpcomingCartoons,
   // Secure Player Endpoints
   getSecureMoviePlayerUrl,
   getSecureTVPlayerUrl,
