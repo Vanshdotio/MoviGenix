@@ -4,6 +4,8 @@ const {
   // Movies
   getBollywoodMovies,
   getTollywoodMovies,
+  getWebSeriesList,
+  getWebSeriesRecommendations,
   getPopularMovies,
   getNowPlayingMovies,
   getUpcomingMovies,
@@ -23,6 +25,8 @@ const {
   discoverTV,
   searchTV,
   getTVGenres,
+  getTVShowList,
+  searchWebSeries,
   // Indian TV Custom categories
   getIndianDrama,
   getIndianComedy,
@@ -110,6 +114,7 @@ router.get("/search/movie", searchMovies); // Do not cache search
 router.get("/detail/movie/:id", cacheMiddleware(300), getMovieDetails);
 
 // TV Show Routes
+router.get("/tv-shows", cacheMiddleware(300), getTVShowList);
 router.get("/tv/trending", cacheMiddleware(300), getTVTrending);
 router.get("/tv/popular", cacheMiddleware(300), getTVPopular);
 router.get("/tv/top-rated", cacheMiddleware(300), getTVTopRated);
@@ -173,5 +178,11 @@ router.get("/editors-picks", cacheMiddleware(300), getEditorsPicks);
 router.get("/award-winning", cacheMiddleware(300), getAwardWinning);
 router.get("/recommendations", optionalProtect, cacheMiddleware(60), getPersonalizedRecommendations);
 router.get("/because-you-watched", optionalProtect, cacheMiddleware(60), getBecauseYouWatched);
+
+// Web Series Routes
+router.get("/web-series", cacheMiddleware(300), getWebSeriesList);
+router.get("/web-series/recommendations", optionalProtect, cacheMiddleware(60), getWebSeriesRecommendations);
+router.get("/discover/web-series", cacheMiddleware(300), getWebSeriesList);
+router.get("/search/web-series", searchWebSeries);
 
 module.exports = router;

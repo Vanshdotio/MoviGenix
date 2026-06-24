@@ -23,7 +23,7 @@ const MovieCard = ({ movie, type = "movie" }) => {
     ? `https://image.tmdb.org/t/p/w185${movie.poster_path} 1x, https://image.tmdb.org/t/p/w342${movie.poster_path} 2x`
     : undefined;
 
-  const cardType = type === "anime" ? "anime" : (movie.media_type || type);
+  const cardType = type === "anime" ? "anime" : (type === "web-series" ? "web-series" : (movie.media_type || type));
 
   // Check if item is in user's watchlist
   const watchlist = getWatchlist(cardType);

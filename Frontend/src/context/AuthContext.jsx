@@ -21,6 +21,45 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [guestPreferences, setGuestPreferences] = useState(() => {
+    const saved = localStorage.getItem("guestPreferences");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Error parsing guestPreferences from localStorage:", e);
+      }
+    }
+    return {
+      showAnime: true,
+    };
+  });
+
+  const contentPreferences = user
+    ? {
+        showAnime: user.preferences?.showAnime ?? true,
+      }
+    : guestPreferences;
+
+  const updateContentPreferences = async (newPrefs) => {
+    if (user) {
+      const updatedPreferences = {
+        ...user.preferences,
+        ...newPrefs,
+      };
+      await updateProfile({
+        preferences: updatedPreferences,
+      });
+    } else {
+      const updated = {
+        ...guestPreferences,
+        ...newPrefs,
+      };
+      setGuestPreferences(updated);
+      localStorage.setItem("guestPreferences", JSON.stringify(updated));
+    }
+  };
+
   // Check user session on initial render
   const checkSession = async () => {
     try {
@@ -207,13 +246,13 @@ export const AuthProvider = ({ children }) => {
 
   const getWatchlist = (type) => {
     if (!user || !user.watchlist) return [];
-    const key = type;
+    const key = type === "web-series" ? "webSeries" : type;
     return user.watchlist[key] || [];
   };
 
   const getContinueWatching = (type) => {
     if (!user || !user.continueWatching) return [];
-    const key = type;
+    const key = type === "web-series" ? "webSeries" : type;
     return user.continueWatching[key] || [];
   };
 
@@ -233,6 +272,8 @@ export const AuthProvider = ({ children }) => {
     getWatchlist,
     getContinueWatching,
     isAuthenticated: !!user,
+    contentPreferences,
+    updateContentPreferences,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

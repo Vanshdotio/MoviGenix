@@ -25,7 +25,8 @@ import {
 
 const Home = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, contentPreferences } = useAuth();
+  const showAnime = contentPreferences?.showAnime ?? true;
 
   const [trending, setTrending] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +61,7 @@ const Home = () => {
       ...movie.map(item => ({ ...item, type: "movie" })),
       ...cartoon.map(item => ({ ...item, type: "cartoon" })),
       ...tv.map(item => ({ ...item, type: "tv" })),
-      ...anime.map(item => ({ ...item, type: "anime" }))
+      ...(showAnime ? anime.map(item => ({ ...item, type: "anime" })) : [])
     ];
     return all.sort((a, b) => new Date(b.timestamp || b.watchedAt) - new Date(a.timestamp || a.watchedAt));
   };
@@ -73,7 +74,7 @@ const Home = () => {
       ...movie.map(item => ({ ...item, type: "movie" })),
       ...cartoon.map(item => ({ ...item, type: "cartoon" })),
       ...tv.map(item => ({ ...item, type: "tv" })),
-      ...anime.map(item => ({ ...item, type: "anime" }))
+      ...(showAnime ? anime.map(item => ({ ...item, type: "anime" })) : [])
     ];
   };
 
@@ -128,7 +129,9 @@ const Home = () => {
         <LazyMediaRow title="Crime & Thrillers" fetchFn={() => discoverMedia("movie", "80")} type="movie" viewMoreLink="/movies/crime" />
 
         {/* 8. Anime Collection */}
-        <LazyMediaRow title="Anime Collection" fetchFn={getAnimePopular} type="tv" viewMoreLink="/anime/trending" />
+        {showAnime && (
+          <LazyMediaRow title="Anime Collection" fetchFn={getAnimePopular} type="tv" viewMoreLink="/anime/trending" />
+        )}
 
         {/* 9. Korean Dramas */}
         <LazyMediaRow title="Korean Dramas" fetchFn={getKoreanDramas} type="tv" viewMoreLink="/tv/kdramas" />

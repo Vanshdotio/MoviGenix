@@ -9,6 +9,9 @@ const ADULT_RATINGS = ["NC-17", "R", "TV-MA", "18", "18+", "R18", "A", "X", "18R
 
 const EXPLICIT_RATINGS = ["NC-17", "R18", "X", "18R", "18+"];
 
+const OTT_NETWORKS = "213|1024|2552|2739|3919|3013|3272|453|3186|3353|4330";
+const OTT_NETWORKS_COMMA = "213,1024,2552,2739,3919,3013,3272,453,3186,3353,4330";
+
 const shouldFilter = (user) => {
   if (!user) return true; // Guests default to restricted
   return !user.isAdult || user.safeMode || user.hideMature;
@@ -39,7 +42,7 @@ const isAccessDenied = (rating, user) => {
 };
 
 const getOrFetchContentRating = async (id, type) => {
-  const actualType = type === "anime" ? "tv" : type;
+  const actualType = (type === "anime" || type === "web-series" || type === "webSeries") ? "tv" : type;
   let content = await Content.findOne({ id, type });
   if (content) {
     return content;
@@ -48,6 +51,7 @@ const getOrFetchContentRating = async (id, type) => {
   let isAdult = false;
   let ageRating = "G";
   let title = "";
+  let isOtt = false;
 
   try {
     if (actualType === "movie") {
@@ -94,6 +98,11 @@ const getOrFetchContentRating = async (id, type) => {
       const tvData = response.data;
       title = tvData.name || tvData.original_name || `Show ID ${id}`;
 
+      if (tvData.networks && Array.isArray(tvData.networks)) {
+        const ottIds = [213, 1024, 2552, 2739, 3919, 3013, 3272, 453, 3186, 3353, 4330];
+        isOtt = tvData.networks.some((net) => ottIds.includes(net.id));
+      }
+
       if (tvData.content_ratings && tvData.content_ratings.results) {
         const usRating = tvData.content_ratings.results.find((r) => r.iso_3166_1 === "US");
         const inRating = tvData.content_ratings.results.find((r) => r.iso_3166_1 === "IN");
@@ -130,7 +139,8 @@ const getOrFetchContentRating = async (id, type) => {
     title, 
     isAdult: isAdult || isExplicit, 
     isExplicitAdult: isExplicit, 
-    ageRating 
+    ageRating,
+    isOtt
   });
   return content;
 };
@@ -540,6 +550,88 @@ const fetchIndianTV = async (req, extraParams = {}) => {
   const results = response.data.results || [];
   const filtered = await filterMediaList(results, "tv", req.user);
   return filtered;
+};
+
+const fetchTraditionalTV = async (req, extraParams = {}) => {
+  const { page = 1 } = req.query;
+  const params = getParams({
+    without_genres: "16",
+    without_networks: OTT_NETWORKS_COMMA,
+    page,
+    ...extraParams
+  });
+  const response = await fetchWithRetry(`${TMDB_BASE_URL}/discover/tv`, params);
+  const results = response.data.results || [];
+  const filtered = await filterMediaList(results, "tv", req.user);
+  return filtered;
+};
+
+const getTVShowList = async (req, res) => {
+  try {
+    const { category, page = 1 } = req.query;
+    let extraParams = { page };
+
+    switch (category) {
+      case "trending":
+        extraParams.sort_by = "popularity.desc";
+        break;
+      case "popular":
+        extraParams.sort_by = "popularity.desc";
+        break;
+      case "crime":
+        extraParams.with_genres = "80";
+        extraParams.with_origin_country = "IN";
+        extraParams.sort_by = "popularity.desc";
+        break;
+      case "comedy":
+        extraParams.with_genres = "35";
+        extraParams.with_origin_country = "IN";
+        extraParams.sort_by = "popularity.desc";
+        break;
+      case "reality":
+        extraParams.with_genres = "10764";
+        extraParams.with_origin_country = "IN";
+        extraParams.sort_by = "popularity.desc";
+        break;
+      case "family-dramas":
+        extraParams.with_genres = "18";
+        extraParams.with_origin_country = "IN";
+        extraParams.sort_by = "popularity.desc";
+        break;
+      case "daily-soaps":
+        extraParams.with_genres = "10766";
+        extraParams.with_origin_country = "IN";
+        extraParams.sort_by = "popularity.desc";
+        break;
+      case "tv-classics":
+        extraParams["first_air_date.lte"] = "2015-12-31";
+        extraParams.sort_by = "popularity.desc";
+        break;
+      case "most-watched":
+        try {
+          const response = await fetchWithRetry(`${TMDB_BASE_URL}/trending/tv/week`, getParams({ page }));
+          let results = response.data.results || [];
+          results = results.filter(item => !item.genre_ids || !item.genre_ids.includes(16));
+          let filtered = await filterMediaList(results, "tv", req.user);
+          const ids = filtered.map(item => String(item.id));
+          const cachedContents = await Content.find({ id: { $in: ids }, type: "tv" });
+          const ottMap = new Map(cachedContents.map(c => [c.id, c.isOtt]));
+          filtered = filtered.filter(item => !ottMap.get(String(item.id)));
+          return res.json(filtered);
+        } catch (error) {
+          extraParams.sort_by = "popularity.desc";
+        }
+        break;
+      default:
+        extraParams.sort_by = "popularity.desc";
+    }
+
+    const results = await fetchTraditionalTV(req, extraParams);
+    res.json(results);
+  } catch (error) {
+    console.error("Error in getTVShowList:", error.message);
+    res.status(500).json({ error: "Failed to fetch TV show list" });
+  }
 };
 
 const getTVTrending = async (req, res) => {
@@ -1018,11 +1110,40 @@ const searchTV = async (req, res) => {
     const { query, page = 1 } = req.query;
     if (!query) return res.json({ results: [], total_pages: 0 });
     const response = await fetchWithRetry(`${TMDB_BASE_URL}/search/tv`, getParams({ query: query.trim(), page, language: "en-US" }));
-    response.data.results = await filterMediaList(response.data.results, "tv", req.user);
-    res.json(response.data);
+    let tvResults = (response.data.results || []).filter(item => !(item.genre_ids && item.genre_ids.includes(16)));
+    tvResults = await filterMediaList(tvResults, "tv", req.user);
+    const ids = tvResults.map(item => String(item.id));
+    const cachedContents = await Content.find({ id: { $in: ids }, type: "tv" });
+    const ottMap = new Map(cachedContents.map(c => [c.id, c.isOtt]));
+    tvResults = tvResults.filter(item => !ottMap.get(String(item.id)));
+    res.json({
+      results: tvResults,
+      total_pages: response.data.total_pages
+    });
   } catch (error) {
     console.error("Error in searchTV:", error.message);
     res.status(500).json({ error: "Failed to search TV shows" });
+  }
+};
+
+const searchWebSeries = async (req, res) => {
+  try {
+    const { query, page = 1 } = req.query;
+    if (!query) return res.json({ results: [], total_pages: 0 });
+    const response = await fetchWithRetry(`${TMDB_BASE_URL}/search/tv`, getParams({ query: query.trim(), page, language: "en-US" }));
+    let tvResults = (response.data.results || []).filter(item => !(item.genre_ids && item.genre_ids.includes(16)));
+    tvResults = await filterMediaList(tvResults, "web-series", req.user);
+    const ids = tvResults.map(item => String(item.id));
+    const cachedContents = await Content.find({ id: { $in: ids }, type: "web-series" });
+    const ottMap = new Map(cachedContents.map(c => [c.id, c.isOtt]));
+    tvResults = tvResults.filter(item => ottMap.get(String(item.id)));
+    res.json({
+      results: tvResults,
+      total_pages: response.data.total_pages
+    });
+  } catch (error) {
+    console.error("Error in searchWebSeries:", error.message);
+    res.status(500).json({ error: "Failed to search Web Series" });
   }
 };
 
@@ -1473,8 +1594,16 @@ const getPersonalizedRecommendations = async (req, res) => {
         const isJapanese = item.original_language === "ja" || (item.origin_country && item.origin_country.includes("JP"));
         return isAnimation && !isJapanese;
       });
+    } else if (type === "tv") {
+      results = results.filter(item => !item.genre_ids || !item.genre_ids.includes(16));
     }
-    const filtered = await filterMediaList(results, type, req.user);
+    let filtered = await filterMediaList(results, type, req.user);
+    if (type === "tv") {
+      const ids = filtered.map(item => String(item.id));
+      const cachedContents = await Content.find({ id: { $in: ids }, type: "tv" });
+      const ottMap = new Map(cachedContents.map(c => [c.id, c.isOtt]));
+      filtered = filtered.filter(item => !ottMap.get(String(item.id)));
+    }
     res.json(filtered);
   } catch (error) {
     console.error("Error in getPersonalizedRecommendations:", error.message);
@@ -1483,7 +1612,8 @@ const getPersonalizedRecommendations = async (req, res) => {
       let fallbackUrl = `${TMDB_BASE_URL}/movie/popular`;
       let fallbackParams = { page };
       if (type === "tv") {
-        fallbackUrl = `${TMDB_BASE_URL}/tv/popular`;
+        fallbackUrl = `${TMDB_BASE_URL}/discover/tv`;
+        fallbackParams = { without_genres: "16", without_networks: OTT_NETWORKS_COMMA, page };
       } else if (type === "anime") {
         fallbackUrl = `${TMDB_BASE_URL}/discover/tv`;
         fallbackParams = { with_genres: "16", sort_by: "popularity.desc", page };
@@ -1492,7 +1622,13 @@ const getPersonalizedRecommendations = async (req, res) => {
         fallbackParams = { with_genres: "16", without_original_language: "ja", sort_by: "popularity.desc", page };
       }
       const fallback = await fetchWithRetry(fallbackUrl, getParams(fallbackParams));
-      const filteredFallback = await filterMediaList(fallback.data.results, type, req.user);
+      let filteredFallback = await filterMediaList(fallback.data.results, type, req.user);
+      if (type === "tv") {
+        const ids = filteredFallback.map(item => String(item.id));
+        const cachedContents = await Content.find({ id: { $in: ids }, type: "tv" });
+        const ottMap = new Map(cachedContents.map(c => [c.id, c.isOtt]));
+        filteredFallback = filteredFallback.filter(item => !ottMap.get(String(item.id)));
+      }
       res.json(filteredFallback);
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch recommendations" });
@@ -1539,8 +1675,16 @@ const getBecauseYouWatched = async (req, res) => {
         const isJapanese = item.original_language === "ja" || (item.origin_country && item.origin_country.includes("JP"));
         return isAnimation && !isJapanese;
       });
+    } else if (type === "tv") {
+      results = results.filter(item => !item.genre_ids || !item.genre_ids.includes(16));
     }
-    const filtered = await filterMediaList(results, type, req.user);
+    let filtered = await filterMediaList(results, type, req.user);
+    if (type === "tv") {
+      const ids = filtered.map(item => String(item.id));
+      const cachedContents = await Content.find({ id: { $in: ids }, type: "tv" });
+      const ottMap = new Map(cachedContents.map(c => [c.id, c.isOtt]));
+      filtered = filtered.filter(item => !ottMap.get(String(item.id)));
+    }
     res.json({
       sourceTitle: title,
       results: filtered
@@ -1548,7 +1692,7 @@ const getBecauseYouWatched = async (req, res) => {
   } catch (error) {
     console.error("Error in getBecauseYouWatched:", error.message);
     const { type = "movie" } = req.query;
-    let title = type === "anime" ? "Fullmetal Alchemist: Brotherhood" : (type === "cartoon" ? "SpongeBob SquarePants" : (type === "tv" ? "Game of Thrones" : "Inception"));
+    let title = type === "anime" ? "Fullmetal Alchemist: Brotherhood" : (type === "cartoon" ? "SpongeBob SquarePants" : (type === "tv" ? "Taarak Mehta Ka Ooltah Chashmah" : "Inception"));
     res.json({
       sourceTitle: title,
       results: []
@@ -1738,7 +1882,7 @@ const getSecureTVPlayerUrl = async (req, res) => {
 const getAvailableLanguages = async (req, res) => {
   try {
     const { type, id } = req.params;
-    const actualType = type === "anime" ? "tv" : type;
+    const actualType = (type === "anime" || type === "web-series" || type === "webSeries") ? "tv" : type;
 
     const response = await fetchWithRetry(
       `${TMDB_BASE_URL}/${actualType}/${id}/translations`,
@@ -1850,9 +1994,202 @@ const getTollywoodMovies = async (req, res) => {
   }
 };
 
+const fetchWebSeries = async (req, extraParams = {}) => {
+  const { page = 1 } = req.query;
+  const params = getParams({
+    without_genres: "16",
+    with_networks: OTT_NETWORKS,
+    page,
+    ...extraParams
+  });
+  const response = await fetchWithRetry(`${TMDB_BASE_URL}/discover/tv`, params);
+  const results = response.data.results || [];
+  const filtered = await filterMediaList(results, "web-series", req.user);
+  return filtered;
+};
+
+const getWebSeriesList = async (req, res) => {
+  try {
+    const { category, page = 1, genre, language, country, year, rating } = req.query;
+    
+    let extraParams = { page };
+    
+    if (genre) extraParams.with_genres = genre;
+    if (language) extraParams.with_original_language = language;
+    if (country) extraParams.with_origin_country = country;
+    if (year) extraParams.first_air_date_year = year;
+    if (rating) extraParams["vote_average.gte"] = rating;
+
+    switch (category) {
+      case "trending":
+        extraParams.sort_by = "popularity.desc";
+        break;
+      case "popular":
+        extraParams.sort_by = "popularity.desc";
+        break;
+      case "top-rated":
+        extraParams.sort_by = "vote_average.desc";
+        extraParams["vote_count.gte"] = 100;
+        break;
+      case "new-releases":
+        extraParams.sort_by = "first_air_date.desc";
+        extraParams["first_air_date.lte"] = new Date().toISOString().split("T")[0];
+        break;
+      case "most-watched":
+        try {
+          const response = await fetchWithRetry(`${TMDB_BASE_URL}/trending/tv/week`, getParams({ page }));
+          let results = response.data.results || [];
+          results = results.filter(item => !item.genre_ids || !item.genre_ids.includes(16));
+          let filtered = await filterMediaList(results, "web-series", req.user);
+          const ids = filtered.map(item => String(item.id));
+          const cachedContents = await Content.find({ id: { $in: ids }, type: "web-series" });
+          const ottMap = new Map(cachedContents.map(c => [c.id, c.isOtt]));
+          filtered = filtered.filter(item => ottMap.get(String(item.id)));
+          return res.json(filtered);
+        } catch (error) {
+          extraParams.sort_by = "popularity.desc";
+        }
+        break;
+      case "award-winning":
+        extraParams.sort_by = "popularity.desc";
+        extraParams["vote_count.gte"] = 500;
+        extraParams["vote_average.gte"] = 8.0;
+        break;
+      case "hidden-gems":
+        extraParams.sort_by = "vote_average.desc";
+        extraParams["vote_count.gte"] = 50;
+        extraParams["vote_count.lte"] = 600;
+        extraParams["vote_average.gte"] = 7.5;
+        break;
+      case "editors-picks":
+        extraParams.sort_by = "popularity.desc";
+        extraParams.with_networks = "213|49|2552|1024";
+        break;
+      case "recently-added":
+        extraParams.sort_by = "first_air_date.desc";
+        break;
+      case "binge-worthy":
+        extraParams.sort_by = "popularity.desc";
+        extraParams["vote_average.gte"] = 7.8;
+        break;
+      case "completed":
+        extraParams.with_status = "3,4";
+        break;
+      case "ongoing":
+        extraParams.with_status = "0,2,5";
+        break;
+      case "mini-series":
+        extraParams.with_type = "3";
+        break;
+      case "international":
+        extraParams.without_origin_country = "IN";
+        break;
+      case "indian":
+        extraParams.with_origin_country = "IN";
+        break;
+      case "crime":
+        extraParams.with_genres = genre ? `80,${genre}` : "80";
+        break;
+      case "thriller":
+        extraParams.with_genres = genre ? `9648,18,${genre}` : "9648,18";
+        break;
+      case "comedy":
+        extraParams.with_genres = genre ? `35,${genre}` : "35";
+        break;
+      case "action":
+        extraParams.with_genres = genre ? `10759,${genre}` : "10759";
+        break;
+      case "drama":
+        extraParams.with_genres = genre ? `18,${genre}` : "18";
+        break;
+      case "mystery":
+        extraParams.with_genres = genre ? `9648,${genre}` : "9648";
+        break;
+      default:
+        extraParams.sort_by = "popularity.desc";
+    }
+
+    const results = await fetchWebSeries(req, extraParams);
+    res.json(results);
+  } catch (error) {
+    console.error("Error in getWebSeriesList:", error.message);
+    res.status(500).json({ error: "Failed to fetch web series list" });
+  }
+};
+
+const getWebSeriesRecommendations = async (req, res) => {
+  try {
+    const { page = 1 } = req.query;
+    let referenceId = "1399";
+    let referenceType = "tv";
+
+    if (req.user) {
+      const User = require("../models/User.model");
+      const user = await User.findById(req.user._id);
+
+      const watchlistArray = (user.watchlist && user.watchlist.webSeries) || [];
+      const continueWatchingArray = (user.continueWatching && user.continueWatching.webSeries) || [];
+      const filteredFavs = (user.favorites || []).filter(item => item.type === "web-series");
+      
+      const recentItem = continueWatchingArray[0] || watchlistArray[0] || filteredFavs[0];
+
+      if (recentItem) {
+        referenceId = recentItem.id;
+        referenceType = "tv";
+      } else {
+        const params = {
+          without_genres: "16",
+          with_networks: OTT_NETWORKS,
+          page,
+          sort_by: "popularity.desc"
+        };
+        if (user.country && user.country !== "Unknown") {
+          params.with_origin_country = user.country;
+        }
+        if (user.preferences?.language) {
+          params.with_original_language = user.preferences.language;
+        }
+        const response = await fetchWithRetry(`${TMDB_BASE_URL}/discover/tv`, getParams(params));
+        const filtered = await filterMediaList(response.data.results, "web-series", req.user);
+        return res.json(filtered);
+      }
+    }
+
+    const response = await fetchWithRetry(
+      `${TMDB_BASE_URL}/${referenceType}/${referenceId}/recommendations`,
+      getParams({ page })
+    );
+    let results = response.data.results || [];
+    results = results.filter(item => !item.genre_ids || !item.genre_ids.includes(16));
+    let filtered = await filterMediaList(results, "web-series", req.user);
+    const ids = filtered.map(item => String(item.id));
+    const cachedContents = await Content.find({ id: { $in: ids }, type: "web-series" });
+    const ottMap = new Map(cachedContents.map(c => [c.id, c.isOtt]));
+    filtered = filtered.filter(item => ottMap.get(String(item.id)));
+    res.json(filtered);
+  } catch (error) {
+    console.error("Error in getWebSeriesRecommendations:", error.message);
+    try {
+      const response = await fetchWithRetry(`${TMDB_BASE_URL}/discover/tv`, getParams({
+        without_genres: "16",
+        with_networks: OTT_NETWORKS,
+        sort_by: "popularity.desc",
+        page: req.query.page || 1
+      }));
+      const filtered = await filterMediaList(response.data.results, "web-series", req.user);
+      res.json(filtered);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch recommendations" });
+    }
+  }
+};
+
 module.exports = {
   getBollywoodMovies,
   getTollywoodMovies,
+  // Web Series
+  getWebSeriesList,
+  getWebSeriesRecommendations,
   // Movies
   getPopularMovies,
   getNowPlayingMovies,
@@ -1872,6 +2209,8 @@ module.exports = {
   getTVDetails,
   discoverTV,
   searchTV,
+  searchWebSeries,
+  getTVShowList,
   getTVGenres,
   // Indian TV Custom categories
   getIndianDrama,

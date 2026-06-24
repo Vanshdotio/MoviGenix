@@ -7,8 +7,9 @@ const Nav = () => {
   const navRef = useRef(null);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, contentPreferences } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const showAnime = contentPreferences?.showAnime ?? true;
 
   useEffect(() => {
     let lastScrollTop = 0;
@@ -42,10 +43,11 @@ const Nav = () => {
   // Build menu items for mobile Staggered Menu
   const menuItems = [
     { label: "Home", link: "/" },
-    { label: "Cartoon", link: "/cartoon" },
+    { label: "Web Series", link: "/web-series" },
     { label: "TV Shows", link: "/tv" },
-    { label: "Anime", link: "/anime" },
-  ];
+    { label: "Cartoon", link: "/cartoon" },
+    showAnime && { label: "Anime", link: "/anime" },
+  ].filter(Boolean);
 
   if (user) {
     if (user.role === "admin") {
@@ -57,6 +59,10 @@ const Nav = () => {
     menuItems.push({
       label: "My Profile",
       link: "/profile"
+    });
+    menuItems.push({
+      label: "Content Preferences",
+      link: "/profile?tab=preferences"
     });
     menuItems.push({
       isAccount: true,
@@ -102,9 +108,10 @@ const Nav = () => {
           {/* Desktop Navigation Links */}
           <div className="hidden lg:flex items-center gap-6 md:gap-8">
             <Link to="/" className="hover:text-yellow-400 transition-colors duration-200">Home</Link>
-            <Link to="/cartoon" className="hover:text-yellow-400 transition-colors duration-200">Cartoon</Link>
+            <Link to="/web-series" className="hover:text-yellow-400 transition-colors duration-200">Web Series</Link>
             <Link to="/tv" className="hover:text-yellow-400 transition-colors duration-200">TV Shows</Link>
-            <Link to="/anime" className="hover:text-yellow-400 transition-colors duration-200">Anime</Link>
+            <Link to="/cartoon" className="hover:text-yellow-400 transition-colors duration-200">Cartoon</Link>
+            {showAnime && <Link to="/anime" className="hover:text-yellow-400 transition-colors duration-200">Anime</Link>}
             {user && user.role === "admin" && (
               <Link to="/admin" className="text-yellow-400 hover:text-white font-bold transition-colors duration-200 flex items-center gap-1">
                 <i className="ri-shield-user-line text-sm"></i>
@@ -178,6 +185,16 @@ const Nav = () => {
                         <path d="M12 2C17.52 2 22 6.48 22 12C22 17.52 17.52 22 12 22C6.48 22 2 17.52 2 12C2 6.48 6.48 2 12 2ZM12 20C16.42 20 20 16.42 20 12C20 7.58 16.42 4 12 4C7.58 4 4 7.58 4 12C4 16.42 7.58 20 12 20ZM12.5 7V12.25L17 14.92L16.25 16.15L11 13V7H12.5Z" />
                       </svg>
                       My Profile
+                    </Link>
+                    <Link
+                      to="/profile?tab=preferences"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2 text-xs text-zinc-300 hover:text-white hover:bg-white/5 transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-zinc-400">
+                        <path d="M12 1L21.5 6.5V17.5L12 23L2.5 17.5V6.5L12 1ZM12 3.3L4.5 7.6V16.4L12 20.7L19.5 16.4V7.6L12 3.3ZM12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12C16 14.2091 14.2091 16 12 16ZM12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" />
+                      </svg>
+                      Content Preferences
                     </Link>
                     <button
                       onClick={() => {

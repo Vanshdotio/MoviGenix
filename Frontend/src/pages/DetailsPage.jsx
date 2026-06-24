@@ -51,8 +51,8 @@ const DetailsPage = ({ type: propType }) => {
   const lastSavedProgressRef = useRef(0);
   const lastSavedTimeRef = useRef(0);
 
-  // Map "anime" to "tv" since the TMDB backend uses the TV show schema for Anime
-  const apiType = type === "anime" ? "tv" : type;
+  // Map "anime" and "web-series" to "tv" since the TMDB backend uses the TV show schema for Anime and Web Series
+  const apiType = (type === "anime" || type === "web-series" || type === "webSeries") ? "tv" : type;
   const isMovie = type === "movie" || (media && !media.seasons);
 
   useEffect(() => {
@@ -492,7 +492,7 @@ const DetailsPage = ({ type: propType }) => {
           <div className="col-span-1 md:col-span-3 flex flex-col items-start gap-4">
             <div className="flex flex-wrap items-center gap-3 text-xs md:text-sm font-medium text-gray-300">
               <span className="bg-yellow-400 text-black font-bold px-2 py-0.5 rounded text-xs uppercase">
-                {type === "anime" ? "Anime" : type === "cartoon" ? "Cartoon" : type === "tv" ? "TV Show" : "Movie"}
+                {type === "anime" ? "Anime" : type === "cartoon" ? "Cartoon" : type === "tv" ? "TV Show" : type === "web-series" ? "Web Series" : "Movie"}
               </span>
               {releaseDate && <span>{releaseDate.slice(0, 4)}</span>}
               {isMovie && runtime && (
@@ -792,7 +792,7 @@ const DetailsPage = ({ type: propType }) => {
                     </button>
                   </div>
                 )}
-                {type === "tv" && nextEpisode && (
+                {!isMovie && nextEpisode && (
                   <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs flex justify-between items-center">
                     <div>
                       <span className="text-blue-400 font-bold uppercase tracking-wider text-[10px]">Next Episode</span>
@@ -1117,10 +1117,26 @@ const DetailsPage = ({ type: propType }) => {
           />
         )}
 
+        {(type === "tv" || type === "web-series") && media.similar?.results && media.similar.results.length > 0 && (
+          <MediaSlider
+            title={type === "web-series" ? "Similar Web Series" : "Similar TV Shows"}
+            items={media.similar.results.filter(item => !item.genre_ids || !item.genre_ids.includes(16))}
+            type={type}
+          />
+        )}
+
         {(type === "movie" || type === "cartoon") && media.recommendations?.results && media.recommendations.results.length > 0 && (
           <MediaSlider
             title="Recommendations"
             items={media.recommendations.results}
+            type={type}
+          />
+        )}
+
+        {(type === "tv" || type === "web-series") && media.recommendations?.results && media.recommendations.results.length > 0 && (
+          <MediaSlider
+            title="Recommendations"
+            items={media.recommendations.results.filter(item => !item.genre_ids || !item.genre_ids.includes(16))}
             type={type}
           />
         )}

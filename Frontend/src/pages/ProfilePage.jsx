@@ -16,20 +16,21 @@ const AVATAR_PRESETS = [
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const { user, logout, updateProfile, removeContinueWatching } = useAuth();
+  const { user, logout, updateProfile, removeContinueWatching, contentPreferences } = useAuth();
+  const showAnime = contentPreferences?.showAnime ?? true;
   
   const getWatchlistCount = () => {
     if (!user || !user.watchlist) return 0;
     if (Array.isArray(user.watchlist)) return user.watchlist.length;
     const { movie = [], cartoon = [], tv = [], anime = [] } = user.watchlist;
-    return movie.length + cartoon.length + tv.length + anime.length;
+    return movie.length + cartoon.length + tv.length + (showAnime ? anime.length : 0);
   };
 
   const getContinueWatchingCount = () => {
     if (!user || !user.continueWatching) return 0;
     if (Array.isArray(user.continueWatching)) return user.continueWatching.length;
     const { movie = [], cartoon = [], tv = [], anime = [] } = user.continueWatching;
-    return movie.length + cartoon.length + tv.length + anime.length;
+    return movie.length + cartoon.length + tv.length + (showAnime ? anime.length : 0);
   };
 
   const getMergedWatchlist = () => {
@@ -40,7 +41,7 @@ const ProfilePage = () => {
       ...movie.map(item => ({ ...item, type: "movie" })),
       ...cartoon.map(item => ({ ...item, type: "cartoon" })),
       ...tv.map(item => ({ ...item, type: "tv" })),
-      ...anime.map(item => ({ ...item, type: "anime" }))
+      ...(showAnime ? anime.map(item => ({ ...item, type: "anime" })) : [])
     ];
   };
 
@@ -52,9 +53,17 @@ const ProfilePage = () => {
       ...movie.map(item => ({ ...item, type: "movie" })),
       ...cartoon.map(item => ({ ...item, type: "cartoon" })),
       ...tv.map(item => ({ ...item, type: "tv" })),
-      ...anime.map(item => ({ ...item, type: "anime" }))
+      ...(showAnime ? anime.map(item => ({ ...item, type: "anime" })) : [])
     ];
     return all.sort((a, b) => new Date(b.watchedAt) - new Date(a.watchedAt));
+  };
+
+  const getFilteredFavorites = () => {
+    if (!user || !user.favorites) return [];
+    return user.favorites.filter(item => {
+      if (item.type === "anime" && !showAnime) return false;
+      return true;
+    });
   };
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -68,6 +77,7 @@ const ProfilePage = () => {
   // Content preferences states
   const [safeMode, setSafeMode] = useState(user?.safeMode ?? true);
   const [hideMature, setHideMature] = useState(user?.hideMature ?? true);
+  const [showAnimeState, setShowAnimeState] = useState(user?.preferences?.showAnime ?? true);
   const [isEditingDob, setIsEditingDob] = useState(false);
   const [dob, setDob] = useState(user?.dob || "");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -84,16 +94,12 @@ const ProfilePage = () => {
       setLanguage(user.preferences?.language || "en");
       setSafeMode(user.safeMode ?? true);
       setHideMature(user.hideMature ?? true);
+      setShowAnimeState(user.preferences?.showAnime ?? true);
       setDob(user.dob || "");
     }
   }, [user]);
 
-  // Guard: redirect minors away from content preferences tab
-  useEffect(() => {
-    if (activeTab === "preferences" && (!user || !user.isAdult || user.age < 18)) {
-      setActiveTab("profile");
-    }
-  }, [activeTab, user]);
+  // No minor redirect guard needed since minors can edit their showAnime setting
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -133,6 +139,10 @@ const ProfilePage = () => {
       await updateProfile({
         safeMode,
         hideMature,
+        preferences: {
+          ...user?.preferences,
+          showAnime: showAnimeState,
+        }
       });
       setSuccessMsg("Content preferences updated successfully.");
     } catch (err) {
@@ -317,8 +327,8 @@ const ProfilePage = () => {
           >
             Account Settings
           </button>
-          {/* Content Preferences — only visible for adult (18+) users */}
-          {user && user.isAdult && user.age >= 18 && (
+          {/* Content Preferences */}
+          {user && (
             <button
               onClick={() => setActiveTab("preferences")}
               className={`py-3 px-5 border-b-2 font-semibold text-sm transition-all whitespace-nowrap cursor-pointer ${
@@ -348,7 +358,7 @@ const ProfilePage = () => {
                 : "border-transparent text-zinc-500 hover:text-white"
             }`}
           >
-            Favorites ({user?.favorites?.length || 0})
+            Favorites ({getFilteredFavorites().length})
           </button>
           <button
             onClick={() => setActiveTab("continue-watching")}
@@ -466,7 +476,7 @@ const ProfilePage = () => {
             </div>
           )}
 
-          {activeTab === "preferences" && user && user.isAdult && user.age >= 18 && (
+          {activeTab === "preferences" && user && (
             <div className="max-w-2xl bg-zinc-950/40 p-6 sm:p-8 rounded-2xl border border-white/5 backdrop-blur-md space-y-6 animate-fade-in font-[Inter]">
               <div>
                 <h2 className="text-xl font-bold mb-1">Content Preferences</h2>
@@ -563,10 +573,31 @@ const ProfilePage = () => {
                   </button>
                 </div>
 
+                {/* Anime Visibility */}
+                <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/40 border border-white/5">
+                  <div>
+                    <h4 className="text-sm font-semibold text-white font-[Inter]">Show Anime</h4>
+                    <p className="text-xs text-zinc-500 mt-0.5">Toggle the visibility of Anime routes, sections, and recommendations.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAnimeState(!showAnimeState)}
+                    className={`relative w-12 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
+                      showAnimeState ? "bg-blue-500" : "bg-zinc-800"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                        showAnimeState ? "translate-x-6" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={loading || !user?.isAdult}
+                    disabled={loading}
                     className="gradient-btn px-5 py-2.5 rounded-xl text-white font-semibold text-xs cursor-pointer shadow-lg hover:shadow-blue-500/20 active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
                   >
                     Save Preferences
@@ -656,7 +687,7 @@ const ProfilePage = () => {
           {activeTab === "favorites" && (
             <div className="animate-fade-in">
               <h2 className="text-xl font-bold mb-6">Your Favorites</h2>
-              {renderMediaGrid(user?.favorites, "movie")}
+              {renderMediaGrid(getFilteredFavorites(), "movie")}
             </div>
           )}
 

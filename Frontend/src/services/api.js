@@ -359,14 +359,14 @@ export const searchMedia = async (type, query, page = 1) => {
  */
 
 export const getMediaDetails = async (type, id) => {
-  // If the type is anime, we query tv details in TMDB
-  const actualType = type === "anime" ? "tv" : type;
+  // If the type is anime or web series, we query tv details in TMDB
+  const actualType = (type === "anime" || type === "web-series" || type === "webSeries") ? "tv" : type;
   const response = await apiClient.get(`/detail/${actualType}/${id}`);
   return response.data;
 };
 
 export const getSecurePlayerUrl = async (type, tmdbId, params = {}) => {
-  const actualType = type === "anime" ? "tv" : type;
+  const actualType = (type === "anime" || type === "web-series" || type === "webSeries") ? "tv" : type;
   const path = actualType === "movie"
     ? `/embed/movie/${tmdbId}`
     : `/embed/tv/${tmdbId}/${params.season || 1}/${params.episode || 1}`;
@@ -618,6 +618,27 @@ export const trackAdCompleteApi = async (id, watchedDuration) => {
 
 export const trackAdSkipApi = async (id, watchedDuration) => {
   const response = await adsClient.post(`/player/${id}/skip`, { watchedDuration });
+  return response.data;
+};
+
+export const getWebSeriesList = async (category, page = 1, filters = {}) => {
+  const response = await apiClient.get("/web-series", {
+    params: { category, page, ...filters },
+  });
+  return response.data;
+};
+
+export const getWebSeriesRecommendations = async (page = 1) => {
+  const response = await apiClient.get("/web-series/recommendations", {
+    params: { page },
+  });
+  return response.data;
+};
+
+export const getTVShowList = async (category, page = 1) => {
+  const response = await apiClient.get("/tv-shows", {
+    params: { category, page },
+  });
   return response.data;
 };
 

@@ -2,12 +2,23 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { searchMedia } from "../services/api";
 import { trackSearch } from "../services/telemetry";
+import { useAuth } from "../context/AuthContext";
 
 const SearchOverlay = () => {
   const [text, setText] = useState("");
   const [searchType, setSearchType] = useState("movie"); // 'movie', 'tv', 'anime', 'cartoon'
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const { contentPreferences } = useAuth();
+  const showAnime = contentPreferences?.showAnime ?? true;
+
+  // Reset search type if current category is disabled
+  useEffect(() => {
+    if (!showAnime && searchType === "anime") {
+      setSearchType("movie");
+    }
+  }, [showAnime, searchType]);
 
   const inputRef = useRef(null);
 
@@ -19,6 +30,10 @@ const SearchOverlay = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (searchType === "anime" && !showAnime) {
+        setResults([]);
+        return;
+      }
       if (!text.trim()) {
         setResults([]);
         return;
@@ -59,6 +74,8 @@ const SearchOverlay = () => {
         return "Search Anime...";
       case "cartoon":
         return "Search Cartoons...";
+      case "web-series":
+        return "Search Web Series...";
       default:
         return "Search...";
     }
@@ -74,6 +91,8 @@ const SearchOverlay = () => {
         return "Anime";
       case "cartoon":
         return "Cartoons";
+      case "web-series":
+        return "Web Series";
       default:
         return "Content";
     }
@@ -148,10 +167,11 @@ const SearchOverlay = () => {
       <div className="flex justify-center gap-4 mt-6">
         {[
           { key: "movie", label: "Movies" },
+          { key: "web-series", label: "Web Series" },
           { key: "tv", label: "TV Shows" },
-          { key: "anime", label: "Anime" },
+          showAnime && { key: "anime", label: "Anime" },
           { key: "cartoon", label: "Cartoons" },
-        ].map((tab) => (
+        ].filter(Boolean).map((tab) => (
           <button
             key={tab.key}
             onClick={() => {

@@ -184,7 +184,7 @@ const getOrFetchContentRating = async (id, type) => {
 
 const enrichContinueWatchingLists = async (continueWatching) => {
   if (!continueWatching) return continueWatching;
-  const categories = ["movie", "cartoon", "tv", "anime"];
+  const categories = ["movie", "cartoon", "tv", "anime", "webSeries"];
   for (const cat of categories) {
     const list = continueWatching[cat];
     if (Array.isArray(list) && list.length > 0) {
@@ -271,6 +271,14 @@ const filterUserMediaLists = async (user) => {
         })),
       );
     }
+    if (userObj.watchlist.webSeries) {
+      mediaItems.push(
+        ...userObj.watchlist.webSeries.map((w) => ({
+          id: String(w.id),
+          type: "web-series",
+        })),
+      );
+    }
   }
   if (userObj.continueWatching) {
     if (userObj.continueWatching.movie) {
@@ -302,6 +310,14 @@ const filterUserMediaLists = async (user) => {
         ...userObj.continueWatching.anime.map((a) => ({
           id: String(a.animeId || a.id),
           type: "anime",
+        })),
+      );
+    }
+    if (userObj.continueWatching.webSeries) {
+      mediaItems.push(
+        ...userObj.continueWatching.webSeries.map((w) => ({
+          id: String(w.id),
+          type: "web-series",
         })),
       );
     }
@@ -382,6 +398,11 @@ const filterUserMediaLists = async (user) => {
         (a) => !checkAccessDenied(cachedMap.get(`anime:${a.id}`)),
       );
     }
+    if (userObj.watchlist.webSeries) {
+      userObj.watchlist.webSeries = userObj.watchlist.webSeries.filter(
+        (w) => !checkAccessDenied(cachedMap.get(`web-series:${w.id}`)),
+      );
+    }
   }
   if (userObj.continueWatching) {
     if (userObj.continueWatching.movie) {
@@ -403,6 +424,11 @@ const filterUserMediaLists = async (user) => {
     if (userObj.continueWatching.anime) {
       userObj.continueWatching.anime = userObj.continueWatching.anime.filter(
         (a) => !checkAccessDenied(cachedMap.get(`anime:${a.animeId || a.id}`)),
+      );
+    }
+    if (userObj.continueWatching.webSeries) {
+      userObj.continueWatching.webSeries = userObj.continueWatching.webSeries.filter(
+        (w) => !checkAccessDenied(cachedMap.get(`web-series:${w.id}`)),
       );
     }
   }
@@ -759,6 +785,8 @@ const updateProfile = async (req, res) => {
         user.preferences.volume = preferences.volume;
       if (preferences.audioMode !== undefined)
         user.preferences.audioMode = preferences.audioMode;
+      if (typeof preferences.showAnime === "boolean")
+        user.preferences.showAnime = preferences.showAnime;
     }
 
     if (dob) {
@@ -907,11 +935,12 @@ const toggleWatchlist = async (req, res) => {
 
     // Ensure structure exists
     if (!user.watchlist)
-      user.watchlist = { movie: [], cartoon: [], tv: [], anime: [] };
+      user.watchlist = { movie: [], cartoon: [], tv: [], anime: [], webSeries: [] };
     if (!user.watchlist.movie) user.watchlist.movie = [];
     if (!user.watchlist.cartoon) user.watchlist.cartoon = [];
     if (!user.watchlist.tv) user.watchlist.tv = [];
     if (!user.watchlist.anime) user.watchlist.anime = [];
+    if (!user.watchlist.webSeries) user.watchlist.webSeries = [];
 
     const listKey =
       type === "movie"
@@ -920,7 +949,9 @@ const toggleWatchlist = async (req, res) => {
           ? "cartoon"
           : type === "tv"
             ? "tv"
-            : "anime";
+            : type === "web-series" || type === "webSeries"
+              ? "webSeries"
+              : "anime";
     const targetList = user.watchlist[listKey];
 
     const index = targetList.findIndex((item) => item.id === String(id));
@@ -987,11 +1018,12 @@ const addContinueWatching = async (req, res) => {
     }
 
     if (!user.continueWatching)
-      user.continueWatching = { movie: [], cartoon: [], tv: [], anime: [] };
+      user.continueWatching = { movie: [], cartoon: [], tv: [], anime: [], webSeries: [] };
     if (!user.continueWatching.movie) user.continueWatching.movie = [];
     if (!user.continueWatching.cartoon) user.continueWatching.cartoon = [];
     if (!user.continueWatching.tv) user.continueWatching.tv = [];
     if (!user.continueWatching.anime) user.continueWatching.anime = [];
+    if (!user.continueWatching.webSeries) user.continueWatching.webSeries = [];
 
     const stringId = String(id);
 
@@ -1057,6 +1089,22 @@ const addContinueWatching = async (req, res) => {
       });
       user.continueWatching.anime = filteredList.slice(0, 20);
       user.markModified("continueWatching.anime");
+    } else if (type === "web-series" || type === "webSeries") {
+      const targetList = user.continueWatching.webSeries || [];
+      const filteredList = targetList.filter(
+        (item) => (item.id !== stringId),
+      );
+      filteredList.unshift({
+        id: stringId,
+        season: Number(season) || 1,
+        episode: Number(episode) || 1,
+        progress: Number(progress) || 0,
+        duration: Number(duration) || 0,
+        selectedAudio: selectedAudio || "",
+        timestamp: new Date(),
+      });
+      user.continueWatching.webSeries = filteredList.slice(0, 20);
+      user.markModified("continueWatching.webSeries");
     }
 
     await user.save();
@@ -1088,12 +1136,13 @@ const removeContinueWatching = async (req, res) => {
     const user = await User.findById(req.user._id);
 
     if (!user.continueWatching) {
-      user.continueWatching = { movie: [], cartoon: [], tv: [], anime: [] };
+      user.continueWatching = { movie: [], cartoon: [], tv: [], anime: [], webSeries: [] };
     }
     if (!user.continueWatching.movie) user.continueWatching.movie = [];
     if (!user.continueWatching.cartoon) user.continueWatching.cartoon = [];
     if (!user.continueWatching.tv) user.continueWatching.tv = [];
     if (!user.continueWatching.anime) user.continueWatching.anime = [];
+    if (!user.continueWatching.webSeries) user.continueWatching.webSeries = [];
 
     const stringId = String(id);
     const continueKey =
@@ -1103,7 +1152,9 @@ const removeContinueWatching = async (req, res) => {
           ? "cartoon"
           : type === "tv"
             ? "tv"
-            : "anime";
+            : type === "web-series" || type === "webSeries"
+              ? "webSeries"
+              : "anime";
     const targetList = user.continueWatching[continueKey] || [];
 
     if (type === "movie") {
@@ -1126,6 +1177,11 @@ const removeContinueWatching = async (req, res) => {
         (item) => item.id !== stringId && item.animeId !== stringId,
       );
       user.markModified("continueWatching.anime");
+    } else if (type === "web-series" || type === "webSeries") {
+      user.continueWatching.webSeries = targetList.filter(
+        (item) => item.id !== stringId,
+      );
+      user.markModified("continueWatching.webSeries");
     }
 
     await user.save();

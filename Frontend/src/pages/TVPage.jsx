@@ -1,94 +1,39 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  getTVTrending,
-  getTVPopular,
-  getTVTopRated,
-  getTVDrama,
-  getTVComedy,
-  getTVCrime,
-  getTVThriller,
-  getTVReality,
-  getTVHiddenGems,
-  getTVTrendingInternational,
-  getTVHollywood,
+  getTVShowList,
   getPersonalizedRecommendations,
   getBecauseYouWatched,
 } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import HeroSlider from "../components/HeroSlider";
 import MediaSlider from "../components/MediaSlider";
+import LazyMediaRow from "../components/LazyMediaRow";
 import Loader from "../components/Loader";
 
 const TVPage = () => {
   const navigate = useNavigate();
   const { user, getWatchlist, getContinueWatching } = useAuth();
-  
-  // Section states
-  const [trendingTV, setTrendingTV] = useState([]);
-  const [popularTV, setPopularTV] = useState([]);
-  const [topRatedTV, setTopRatedTV] = useState([]);
-  const [drama, setDrama] = useState([]);
-  const [comedy, setComedy] = useState([]);
-  const [crime, setCrime] = useState([]);
-  const [thriller, setThriller] = useState([]);
-  const [reality, setReality] = useState([]);
-  const [hiddenGems, setHiddenGems] = useState([]);
-  const [trendingInternational, setTrendingInternational] = useState([]);
-  const [hollywood, setHollywood] = useState([]);
-  const [recommendedTV, setRecommendedTV] = useState([]);
-  const [becauseYouWatched, setBecauseYouWatched] = useState({ sourceTitle: "", results: [] });
+  const [heroItems, setHeroItems] = useState([]);
+  const [loadingHero, setLoadingHero] = useState(true);
 
-  const [loadingPage, setLoadingPage] = useState(true);
-
-  // Load initial content
+  // Fetch traditional TV trending shows initially for the Hero Slider
   useEffect(() => {
-    const loadContent = async () => {
+    const fetchHero = async () => {
       try {
-        setLoadingPage(true);
-        const endpoints = [
-          getTVTrending(),                           // 0
-          getTVPopular(),                            // 1
-          getTVTopRated(),                           // 2
-          getTVDrama(),                              // 3
-          getTVComedy(),                             // 4
-          getTVCrime(),                              // 5
-          getTVThriller(),                           // 6
-          getTVReality(),                            // 7
-          getTVHiddenGems(),                         // 8
-          getTVTrendingInternational(),              // 9
-          getTVHollywood(),                          // 10
-          getPersonalizedRecommendations("tv"),      // 11
-          getBecauseYouWatched("tv"),                // 12
-        ];
-
-        const results = await Promise.allSettled(endpoints);
-
-        if (results[0].status === "fulfilled") setTrendingTV(results[0].value || []);
-        if (results[1].status === "fulfilled") setPopularTV(results[1].value || []);
-        if (results[2].status === "fulfilled") setTopRatedTV(results[2].value || []);
-        if (results[3].status === "fulfilled") setDrama(results[3].value || []);
-        if (results[4].status === "fulfilled") setComedy(results[4].value || []);
-        if (results[5].status === "fulfilled") setCrime(results[5].value || []);
-        if (results[6].status === "fulfilled") setThriller(results[6].value || []);
-        if (results[7].status === "fulfilled") setReality(results[7].value || []);
-        if (results[8].status === "fulfilled") setHiddenGems(results[8].value || []);
-        if (results[9].status === "fulfilled") setTrendingInternational(results[9].value || []);
-        if (results[10].status === "fulfilled") setHollywood(results[10].value || []);
-        if (results[11].status === "fulfilled") setRecommendedTV(results[11].value || []);
-        if (results[12].status === "fulfilled") setBecauseYouWatched(results[12].value || { sourceTitle: "", results: [] });
-
+        setLoadingHero(true);
+        const data = await getTVShowList("trending", 1);
+        setHeroItems(data || []);
       } catch (err) {
-        console.error("Error loading TV page content:", err);
+        console.error("Error loading TV page hero:", err);
       } finally {
-        setLoadingPage(false);
+        setLoadingHero(false);
       }
     };
+    fetchHero();
+  }, []);
 
-    loadContent();
-  }, [user]);
-
-  if (loadingPage) {
+  if (loadingHero) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader />
@@ -96,7 +41,6 @@ const TVPage = () => {
     );
   }
 
-  // Get user lists using context helpers
   const continueWatching = getContinueWatching("tv");
   const watchlist = getWatchlist("tv");
   const lastSessionItem = continueWatching[0] || null;
@@ -104,75 +48,116 @@ const TVPage = () => {
   return (
     <div className="min-h-screen bg-black text-white pb-12 select-none font-[Inter]">
       {/* Hero Section */}
-      <HeroSlider items={trendingTV.length > 0 ? trendingTV : popularTV} type="tv" />
+      <HeroSlider items={heroItems.length > 0 ? heroItems : []} type="tv" />
 
-      {/* Standard Landing View with TV Sections */}
+      {/* Landing View with Traditional TV Sections */}
       <div className="relative z-20 -mt-16 md:-mt-24 space-y-2">
-        {/* 1. Continue Watching (TV only) */}
+        {/* Continue Watching (TV shows only) */}
         {user && continueWatching.length > 0 && (
           <MediaSlider title="Continue Watching" items={continueWatching} type="tv" />
         )}
 
-        {/* 2. Trending Indian Shows */}
-        <MediaSlider title="Trending Indian Shows" items={trendingTV} type="tv" viewMoreLink="/tv/trending" />
-
-        {/* 3. Popular Indian Shows */}
-        <MediaSlider title="Popular Indian Shows" items={popularTV} type="tv" viewMoreLink="/tv/popular" />
-
-        {/* 4. Top Rated Indian Shows */}
-        <MediaSlider title="Top Rated Indian Shows" items={topRatedTV} type="tv" viewMoreLink="/tv/top-rated" />
-
-        {/* 5. Indian Drama */}
-        <MediaSlider title="Indian Drama" items={drama} type="tv" viewMoreLink="/tv/drama" />
-
-        {/* 6. Indian Comedy */}
-        <MediaSlider title="Indian Comedy" items={comedy} type="tv" viewMoreLink="/tv/comedy" />
-
-        {/* 7. Indian Crime */}
-        <MediaSlider title="Indian Crime" items={crime} type="tv" viewMoreLink="/tv/crime" />
-
-        {/* 8. Indian Thriller */}
-        <MediaSlider title="Indian Thrillers" items={thriller} type="tv" viewMoreLink="/tv/thriller" />
-
-        {/* 9. Indian Reality Shows */}
-        <MediaSlider title="Indian Reality Shows" items={reality} type="tv" viewMoreLink="/tv/reality" />
-
-
-        {/* 11. Trending International */}
-        <MediaSlider title="Trending International" items={trendingInternational} type="tv" viewMoreLink="/tv/trending-international" />
-
-        {/* 12. Top Hollywood Shows */}
-        <MediaSlider title="Top Hollywood Shows" items={hollywood} type="tv" viewMoreLink="/tv/hollywood" />
-
-        {/* 13. Recommended Shows */}
-        <MediaSlider
-          title={user ? "Recommended For You" : "Recommended TV Shows"}
-          items={recommendedTV}
+        {/* 1. Trending TV Shows */}
+        <LazyMediaRow
+          title="Trending TV Shows"
+          fetchFn={() => getTVShowList("trending")}
           type="tv"
-          viewMoreLink="/tv/recommended"
+          viewMoreLink="/tv/trending"
         />
 
-        {/* 14. Because You Watched */}
-        {becauseYouWatched.results && becauseYouWatched.results.length > 0 && (
-          <MediaSlider
-            title={`Because You Watched: ${becauseYouWatched.sourceTitle}`}
-            items={becauseYouWatched.results}
-            type="tv"
-            viewMoreLink="/tv/because-you-watched"
-          />
-        )}
+        {/* 2. Popular TV Shows */}
+        <LazyMediaRow
+          title="Popular TV Shows"
+          fetchFn={() => getTVShowList("popular")}
+          type="tv"
+          viewMoreLink="/tv/popular"
+        />
 
-        {/* 15. TV Watchlist */}
+        {/* 3. Crime Shows */}
+        <LazyMediaRow
+          title="Crime Shows"
+          fetchFn={() => getTVShowList("crime")}
+          type="tv"
+          viewMoreLink="/tv/crime"
+        />
+
+        {/* 4. Comedy Shows */}
+        <LazyMediaRow
+          title="Comedy Shows"
+          fetchFn={() => getTVShowList("comedy")}
+          type="tv"
+          viewMoreLink="/tv/comedy"
+        />
+
+        {/* 5. Reality Shows */}
+        <LazyMediaRow
+          title="Reality Shows"
+          fetchFn={() => getTVShowList("reality")}
+          type="tv"
+          viewMoreLink="/tv/reality"
+        />
+
+        {/* 6. Family Dramas */}
+        <LazyMediaRow
+          title="Family Dramas"
+          fetchFn={() => getTVShowList("family-dramas")}
+          type="tv"
+          viewMoreLink="/tv/family-dramas"
+        />
+
+        {/* 7. Daily Soaps */}
+        <LazyMediaRow
+          title="Daily Soaps"
+          fetchFn={() => getTVShowList("daily-soaps")}
+          type="tv"
+          viewMoreLink="/tv/daily-soaps"
+        />
+
+        {/* 8. TV Classics */}
+        <LazyMediaRow
+          title="TV Classics"
+          fetchFn={() => getTVShowList("tv-classics")}
+          type="tv"
+          viewMoreLink="/tv/tv-classics"
+        />
+
+        {/* 9. Most Watched This Week */}
+        <LazyMediaRow
+          title="Most Watched This Week"
+          fetchFn={() => getTVShowList("most-watched")}
+          type="tv"
+          viewMoreLink="/tv/most-watched"
+        />
+
+        {/* 10. Recommended For You */}
+        <LazyMediaRow
+          title="Recommended For You"
+          fetchFn={() => getPersonalizedRecommendations("tv")}
+          type="tv"
+          viewMoreLink="/tv/recommended"
+          isAuthRequired={true}
+        />
+
+        {/* 11. Because You Watched */}
+        <LazyMediaRow
+          title="Because You Watched"
+          fetchFn={() => getBecauseYouWatched("tv")}
+          type="tv"
+          viewMoreLink="/tv/because-you-watched"
+          isAuthRequired={true}
+          isDynamic={true}
+        />
+
+        {/* Watchlist */}
         {user && watchlist.length > 0 && (
           <MediaSlider title="TV Watchlist" items={watchlist} type="tv" />
         )}
       </div>
 
-      {/* Continue From Last Session Banner (Continue From Last Episode) */}
+      {/* Continue From Last Session Banner */}
       {lastSessionItem && (
         <div className="px-8 md:px-12 py-10 w-full bg-black">
           <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-zinc-950/60 shadow-2xl flex flex-col md:flex-row items-center justify-between p-6 sm:p-8 backdrop-blur-xl">
-            {/* background thumbnail watermark */}
             <div className="absolute inset-0 opacity-10 pointer-events-none">
               <img
                 src={`https://image.tmdb.org/t/p/w780${lastSessionItem.poster_path}`}

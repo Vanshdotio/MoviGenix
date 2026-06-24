@@ -55,7 +55,10 @@ import {
   getAnimeHiddenGems,
   getAnimeEditorsPicks,
   getGenres,
-  discoverMedia
+  discoverMedia,
+  getWebSeriesList,
+  getWebSeriesRecommendations,
+  getTVShowList
 } from "../services/api";
 import MovieCard from "../components/MovieCard";
 import Loader from "../components/Loader";
@@ -96,19 +99,15 @@ const SECTION_MAP = {
     "because-you-watched": { title: "Because You Watched", fetch: (page) => getBecauseYouWatched("cartoon", page), desc: "Cartoons related to your watch history" }
   },
   tv: {
-    "trending": { title: "Trending TV Shows", fetch: (page) => getTVTrending(page), desc: "Trending Indian television shows" },
-    "popular": { title: "Popular TV Shows", fetch: (page) => getTVPopular(page), desc: "Most popular TV shows right now" },
-    "top-rated": { title: "Top Rated TV Shows", fetch: (page) => getTVTopRated(page), desc: "Highest rated TV shows based on user reviews" },
-    "new-episodes": { title: "New Episodes", fetch: (page) => getTVNewEpisodes(page), desc: "Television episodes airing today" },
-    "on-the-air": { title: "On The Air", fetch: (page) => getTVOnTheAir(page), desc: "TV shows currently on the air" },
-    "drama": { title: "Indian Drama", fetch: (page) => getTVDrama(page), desc: "Popular Indian drama series" },
-    "comedy": { title: "Indian Comedy", fetch: (page) => getTVComedy(page), desc: "Hilarious Indian comedy shows" },
-    "crime": { title: "Indian Crime", fetch: (page) => getTVCrime(page), desc: "Suspenseful Indian crime thrillers" },
-    "thriller": { title: "Indian Thrillers", fetch: (page) => getTVThriller(page), desc: "Gripping Indian suspense thrillers" },
-    "reality": { title: "Indian Reality Shows", fetch: (page) => getTVReality(page), desc: "Popular Indian reality and non-fiction shows" },
-    "hidden-gems": { title: "Hidden Gems", fetch: (page) => getTVHiddenGems(page), desc: "Underappreciated TV shows you might have missed" },
-    "trending-international": { title: "Trending International", fetch: (page) => getTVTrendingInternational(page), desc: "Popular international television shows" },
-    "hollywood": { title: "Top Hollywood Shows", fetch: (page) => getTVHollywood(page), desc: "Highest rated US and UK TV shows" },
+    "trending": { title: "Trending TV Shows", fetch: (page) => getTVShowList("trending", page), desc: "Weekly trending traditional TV shows" },
+    "popular": { title: "Popular TV Shows", fetch: (page) => getTVShowList("popular", page), desc: "Most popular traditional TV shows right now" },
+    "crime": { title: "Crime Shows", fetch: (page) => getTVShowList("crime", page), desc: "Suspenseful traditional crime shows" },
+    "comedy": { title: "Comedy Shows", fetch: (page) => getTVShowList("comedy", page), desc: "Hilarious traditional comedy shows" },
+    "reality": { title: "Reality Shows", fetch: (page) => getTVShowList("reality", page), desc: "Popular traditional reality shows" },
+    "family-dramas": { title: "Family Dramas", fetch: (page) => getTVShowList("family-dramas", page), desc: "Intense and emotional family drama shows" },
+    "daily-soaps": { title: "Daily Soaps", fetch: (page) => getTVShowList("daily-soaps", page), desc: "Traditional daily soaps" },
+    "tv-classics": { title: "TV Classics", fetch: (page) => getTVShowList("tv-classics", page), desc: "Classic channel broadcast shows" },
+    "most-watched": { title: "Most Watched This Week", fetch: (page) => getTVShowList("most-watched", page), desc: "Most watched TV shows this week" },
     "recommended": { title: "Recommended TV Shows", fetch: (page) => getPersonalizedRecommendations("tv", page), desc: "TV shows personalized for your taste" },
     "because-you-watched": { title: "Because You Watched", fetch: (page) => getBecauseYouWatched("tv", page), desc: "TV shows related to your watch history" }
   },
@@ -127,6 +126,30 @@ const SECTION_MAP = {
     "hidden-gems": { title: "Hidden Gems", fetch: (page) => getAnimeHiddenGems(page), desc: "Underappreciated Anime you might have missed" },
     "editors-picks": { title: "Editor's Picks", fetch: (page) => getEditorsPicks("anime", page), desc: "Hand-picked Anime series" },
     "because-you-watched": { title: "Because You Watched", fetch: (page) => getBecauseYouWatched("anime", page), desc: "Anime related to your watch history" }
+  },
+  "web-series": {
+    "trending": { title: "Trending Web Series", fetch: (page) => getWebSeriesList("trending", page), desc: "Weekly trending web series around the world" },
+    "popular": { title: "Popular Web Series", fetch: (page) => getWebSeriesList("popular", page), desc: "Most popular web series right now" },
+    "top-rated": { title: "Top Rated Web Series", fetch: (page) => getWebSeriesList("top-rated", page), desc: "Highest rated web series based on user reviews" },
+    "new-releases": { title: "New Releases", fetch: (page) => getWebSeriesList("new-releases", page), desc: "Newly released web series" },
+    "recommended": { title: "Recommended For You", fetch: (page) => getWebSeriesRecommendations(page), desc: "Web series personalized for your taste" },
+    "most-watched": { title: "Most Watched This Week", fetch: (page) => getWebSeriesList("most-watched", page), desc: "Web series most watched this week" },
+    "award-winning": { title: "Award Winning Series", fetch: (page) => getWebSeriesList("award-winning", page), desc: "Acclaimed web series that won awards" },
+    "hidden-gems": { title: "Hidden Gems", fetch: (page) => getWebSeriesList("hidden-gems", page), desc: "Underappreciated web series you might have missed" },
+    "editors-picks": { title: "Editor's Picks", fetch: (page) => getWebSeriesList("editors-picks", page), desc: "Hand-picked series recommended by our editors" },
+    "recently-added": { title: "Recently Added", fetch: (page) => getWebSeriesList("recently-added", page), desc: "Recently added web series" },
+    "binge-worthy": { title: "Binge Worthy Series", fetch: (page) => getWebSeriesList("binge-worthy", page), desc: "Binge worthy web series" },
+    "completed": { title: "Completed Series", fetch: (page) => getWebSeriesList("completed", page), desc: "Completed web series" },
+    "ongoing": { title: "Ongoing Series", fetch: (page) => getWebSeriesList("ongoing", page), desc: "Ongoing web series" },
+    "mini-series": { title: "Mini Series", fetch: (page) => getWebSeriesList("mini-series", page), desc: "Limited and mini series" },
+    "international": { title: "International Series", fetch: (page) => getWebSeriesList("international", page), desc: "Popular international web series" },
+    "indian": { title: "Indian Web Series", fetch: (page) => getWebSeriesList("indian", page), desc: "Trending Indian web series" },
+    "crime": { title: "Crime Series", fetch: (page) => getWebSeriesList("crime", page), desc: "Suspenseful crime dramas" },
+    "thriller": { title: "Thriller Series", fetch: (page) => getWebSeriesList("thriller", page), desc: "Gripping thriller shows" },
+    "comedy": { title: "Comedy Series", fetch: (page) => getWebSeriesList("comedy", page), desc: "Hilarious comedy series" },
+    "action": { title: "Action Series", fetch: (page) => getWebSeriesList("action", page), desc: "Adrenaline-pumping action and adventure shows" },
+    "drama": { title: "Drama Series", fetch: (page) => getWebSeriesList("drama", page), desc: "Intense and emotional drama series" },
+    "mystery": { title: "Mystery Series", fetch: (page) => getWebSeriesList("mystery", page), desc: "Intriguing mystery shows" },
   }
 };
 
@@ -144,6 +167,12 @@ const SectionPage = ({ type: propType }) => {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  
+  // Custom Web Series filters states
+  const [selectedLanguage, setSelectedLanguage] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedRating, setSelectedRating] = useState("");
   
   const observerTargetRef = useRef(null);
 
@@ -186,7 +215,17 @@ const SectionPage = ({ type: propType }) => {
         setPage(1);
         
         let fetchedData;
-        if (selectedGenre) {
+        if (type === "web-series" && (selectedGenre || selectedLanguage || selectedCountry || selectedYear || selectedRating)) {
+          const data = await getWebSeriesList(section, 1, {
+            genre: selectedGenre,
+            language: selectedLanguage,
+            country: selectedCountry,
+            year: selectedYear,
+            rating: selectedRating
+          });
+          fetchedData = data.results || data || [];
+          setHasMore(fetchedData.length >= 10);
+        } else if (selectedGenre) {
           // If genre is selected, query discover endpoint instead
           const mediaType = type === "movies" ? "movie" : (type === "cartoon" ? "cartoon" : (type === "anime" ? "anime" : "tv"));
           const response = await discoverMedia(mediaType, selectedGenre, 1, sectionConfig.extraParams || {});
@@ -220,7 +259,7 @@ const SectionPage = ({ type: propType }) => {
     };
 
     fetchInitialData();
-  }, [type, section, selectedGenre, sectionConfig]);
+  }, [type, section, selectedGenre, selectedLanguage, selectedCountry, selectedYear, selectedRating, sectionConfig]);
 
   // Load more pages
   const loadMore = async () => {
@@ -230,7 +269,17 @@ const SectionPage = ({ type: propType }) => {
       const nextPage = page + 1;
       let newItems = [];
 
-      if (selectedGenre) {
+      if (type === "web-series" && (selectedGenre || selectedLanguage || selectedCountry || selectedYear || selectedRating)) {
+        const data = await getWebSeriesList(section, nextPage, {
+          genre: selectedGenre,
+          language: selectedLanguage,
+          country: selectedCountry,
+          year: selectedYear,
+          rating: selectedRating
+        });
+        newItems = data.results || data || [];
+        setHasMore(newItems.length >= 10);
+      } else if (selectedGenre) {
         const mediaType = type === "movies" ? "movie" : (type === "cartoon" ? "cartoon" : (type === "anime" ? "anime" : "tv"));
         const response = await discoverMedia(mediaType, selectedGenre, nextPage, sectionConfig.extraParams || {});
         newItems = response.results || [];
@@ -287,7 +336,7 @@ const SectionPage = ({ type: propType }) => {
         observer.unobserve(currentTarget);
       }
     };
-  }, [hasMore, loadingMore, loading, page, selectedGenre]);
+  }, [hasMore, loadingMore, loading, page, selectedGenre, selectedLanguage, selectedCountry, selectedYear, selectedRating]);
 
   if (!sectionConfig) return null;
 
@@ -312,7 +361,7 @@ const SectionPage = ({ type: propType }) => {
     navigate(-1);
   };
 
-  const cardType = type === "movies" ? "movie" : (type === "cartoon" ? "cartoon" : (type === "anime" ? "anime" : "tv"));
+  const cardType = type === "movies" ? "movie" : (type === "cartoon" ? "cartoon" : (type === "anime" ? "anime" : (type === "web-series" ? "web-series" : "tv")));
 
   return (
     <div className="min-h-screen bg-black text-white pb-20 pt-20 px-6 md:px-12 select-none font-[Inter]">
@@ -379,6 +428,78 @@ const SectionPage = ({ type: propType }) => {
               <option value="release">Release Date</option>
             </select>
           </div>
+
+          {type === "web-series" && (
+            <>
+              {/* Language Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">Language:</span>
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="bg-zinc-900 border border-white/10 text-white rounded-xl px-4 py-2.5 text-xs outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition cursor-pointer"
+                >
+                  <option value="">All Languages</option>
+                  <option value="en">English</option>
+                  <option value="hi">Hindi</option>
+                  <option value="ko">Korean</option>
+                  <option value="es">Spanish</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                </select>
+              </div>
+
+              {/* Country Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">Country:</span>
+                <select
+                  value={selectedCountry}
+                  onChange={(e) => setSelectedCountry(e.target.value)}
+                  className="bg-zinc-900 border border-white/10 text-white rounded-xl px-4 py-2.5 text-xs outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition cursor-pointer"
+                >
+                  <option value="">All Countries</option>
+                  <option value="IN">India</option>
+                  <option value="US">United States</option>
+                  <option value="GB">United Kingdom</option>
+                  <option value="KR">South Korea</option>
+                  <option value="ES">Spain</option>
+                </select>
+              </div>
+
+              {/* Year Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">Year:</span>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="bg-zinc-900 border border-white/10 text-white rounded-xl px-4 py-2.5 text-xs outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition cursor-pointer"
+                >
+                  <option value="">All Years</option>
+                  {Array.from({ length: 20 }, (_, idx) => 2026 - idx).map((yr) => (
+                    <option key={yr} value={yr}>
+                      {yr}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Rating Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">Rating:</span>
+                <select
+                  value={selectedRating}
+                  onChange={(e) => setSelectedRating(e.target.value)}
+                  className="bg-zinc-900 border border-white/10 text-white rounded-xl px-4 py-2.5 text-xs outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition cursor-pointer"
+                >
+                  <option value="">All Ratings</option>
+                  <option value="8">8.0+ ⭐</option>
+                  <option value="7">7.0+ ⭐</option>
+                  <option value="6">6.0+ ⭐</option>
+                  <option value="5">5.0+ ⭐</option>
+                </select>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

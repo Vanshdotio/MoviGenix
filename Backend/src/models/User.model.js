@@ -8,7 +8,7 @@ const MediaItemSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ["movie", "tv", "anime", "cartoon"],
+    enum: ["movie", "tv", "anime", "cartoon", "web-series"],
   },
   title: {
     type: String,
@@ -145,6 +145,37 @@ const AnimeContinueWatchingSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+const WebSeriesContinueWatchingSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    required: true,
+  },
+  season: {
+    type: Number,
+    default: 1,
+  },
+  episode: {
+    type: Number,
+    default: 1,
+  },
+  progress: {
+    type: Number,
+    default: 0,
+  },
+  duration: {
+    type: Number,
+    default: 0,
+  },
+  selectedAudio: {
+    type: String,
+    default: "",
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now,
+  }
+}, { _id: false });
+
 const UserSchema = new mongoose.Schema(
   {
     name: {
@@ -238,6 +269,10 @@ const UserSchema = new mongoose.Schema(
         type: [MediaItemSchema],
         default: [],
       },
+      webSeries: {
+        type: [MediaItemSchema],
+        default: [],
+      },
     },
     continueWatching: {
       movie: {
@@ -254,6 +289,10 @@ const UserSchema = new mongoose.Schema(
       },
       anime: {
         type: [AnimeContinueWatchingSchema],
+        default: [],
+      },
+      webSeries: {
+        type: [WebSeriesContinueWatchingSchema],
         default: [],
       },
     },
@@ -285,6 +324,10 @@ const UserSchema = new mongoose.Schema(
       audioMode: {
         type: String,
         default: "Voice Boost",
+      },
+      showAnime: {
+        type: Boolean,
+        default: true,
       },
     },
   },
