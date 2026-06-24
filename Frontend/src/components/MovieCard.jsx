@@ -103,7 +103,7 @@ const MovieCard = ({ movie, type = "movie" }) => {
 
         {/* COMING SOON Badge (top-left, only for upcoming) */}
         {upcoming && (
-          <span className="absolute top-2 left-2 z-20 bg-violet-600/90 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shadow-lg">
+          <span className="absolute top-2 left-2 z-20  bg-violet-600/90 backdrop-blur-sm text-white text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shadow-lg">
             Coming Soon
           </span>
         )}
@@ -136,7 +136,7 @@ const MovieCard = ({ movie, type = "movie" }) => {
             {upcoming ? (
               /* Coming Soon state — show calendar icon + watchlist */
               <>
-                <div className="flex-1 bg-violet-600/30 border border-violet-500/50 text-violet-300 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5">
+                <div className="flex-1 shrink-0 bg-violet-600/30 border border-violet-500/50 text-violet-300 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
                     <path d="M17 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H7V1H9V3H15V1H17V3ZM19 11H5V19H19V11ZM15 3H9V5H15V3ZM4 9H20V5H4V9Z" />
                   </svg>

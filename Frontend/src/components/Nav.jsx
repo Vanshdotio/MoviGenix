@@ -47,7 +47,6 @@ const Nav = () => {
     { label: "TV Shows", link: "/tv" },
     { label: "Cartoon", link: "/cartoon" },
     showAnime && { label: "Anime", link: "/anime" },
-    { label: "🔔 Upcoming", link: "/upcoming" },
   ].filter(Boolean);
 
   if (user) {
@@ -113,12 +112,6 @@ const Nav = () => {
             <Link to="/tv" className="hover:text-yellow-400 transition-colors duration-200">TV Shows</Link>
             <Link to="/cartoon" className="hover:text-yellow-400 transition-colors duration-200">Cartoon</Link>
             {showAnime && <Link to="/anime" className="hover:text-yellow-400 transition-colors duration-200">Anime</Link>}
-            <Link to="/upcoming" className="flex items-center gap-1 hover:text-violet-400 transition-colors duration-200 font-medium">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
-                <path d="M20 17H22V19H2V17H4V10C4 5.58172 7.58172 2 12 2C16.4183 2 20 5.58172 20 10V17ZM18 17V10C18 6.68629 15.3137 4 12 4C8.68629 4 6 6.68629 6 10V17H18ZM9 21H15V23H9V21Z" />
-              </svg>
-              Upcoming
-            </Link>
             {user && user.role === "admin" && (
               <Link to="/admin" className="text-yellow-400 hover:text-white font-bold transition-colors duration-200 flex items-center gap-1">
                 <i className="ri-shield-user-line text-sm"></i>
