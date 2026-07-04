@@ -3,7 +3,20 @@ import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { getMediaDetails, getTVSeasonDetails } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { isUpcomingContent, formatReleaseDate, getCountdownDays, getCountdownLabel } from "../utils/releaseUtils";
+import {
+  SEOHead,
+  generateMovieKeywords,
+  generateTVKeywords,
+  generateMovieJsonLd,
+  generateTVSeriesJsonLd,
+  generateBreadcrumbJsonLd,
+  generateSlug,
+  extractIdFromSlug,
+  formatReleaseYear,
+  truncateDescription
+} from "../seo";
 const VideoPlayer = React.lazy(() => import("../components/VideoPlayer"));
+
 import Loader from "../components/Loader";
 import MediaSlider from "../components/MediaSlider";
 import ProgressiveImage from "../components/ProgressiveImage";
@@ -28,13 +41,14 @@ const EpisodeSkeleton = () => (
 );
 
 const DetailsPage = ({ type: propType }) => {
-  const { type: paramType, id } = useParams();
+  const { type: paramType, id: rawId } = useParams();
   const type = propType || paramType;
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, loading: authLoading, toggleFavorite, toggleWatchlist, toggleNotifyMe, isNotifiedFor, addContinueWatching, getWatchlist, getContinueWatching } = useAuth();
   
   const [media, setMedia] = useState(null);
+  const id = media ? String(media.id) : rawId;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [loadTrailer, setLoadTrailer] = useState(false);
@@ -65,7 +79,7 @@ const DetailsPage = ({ type: propType }) => {
         setExpandedSeason(null);
         setSeasonEpisodes({});
         setLoadTrailer(false);
-        const data = await getMediaDetails(apiType, id);
+        const data = await getMediaDetails(apiType, rawId);
         setMedia(data);
       } catch (err) {
         console.error("Error fetching media details:", err);
@@ -86,7 +100,7 @@ const DetailsPage = ({ type: propType }) => {
 
     fetchDetails();
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [apiType, id, authLoading, isAuthenticated, location.pathname, location.search, navigate]);
+  }, [apiType, rawId, authLoading, isAuthenticated, location.pathname, location.search, navigate]);
 
   // Autoplay trigger
   useEffect(() => {
@@ -472,9 +486,68 @@ const DetailsPage = ({ type: propType }) => {
   };
 
   const cast = media.credits?.cast || [];
+  const director = media.credits?.crew?.find((member) => member.job === "Director");
+
+  const releaseYear = formatReleaseYear(media.release_date || media.first_air_date);
+  
+  let seoTitle = "";
+  let categoryLabel = "";
+  let keywords = "";
+  let jsonLd = null;
+
+  if (type === "movie") {
+    categoryLabel = "Movie";
+    seoTitle = `${title} ${releaseYear} | Movie Details, Cast & Recommendations`;
+    keywords = generateMovieKeywords(media, media.credits);
+    jsonLd = generateMovieJsonLd(media, media.credits);
+  } else {
+    if (type === "anime") {
+      categoryLabel = "Anime";
+      seoTitle = `${title} | Anime Details`;
+    } else if (type === "cartoon") {
+      categoryLabel = "Cartoon";
+      seoTitle = `${title} | Cartoon Details`;
+    } else if (type === "web-series") {
+      categoryLabel = "Web Series";
+      seoTitle = `${title} | Web Series Details`;
+    } else {
+      categoryLabel = "TV Show";
+      seoTitle = `${title} | TV Show Details`;
+    }
+    keywords = generateTVKeywords(media, media.credits, categoryLabel);
+    jsonLd = generateTVSeriesJsonLd(media, media.credits);
+  }
+
+  const slug = generateSlug(title, media.id);
+  const canonicalPath = `/${type}/${slug}`;
+
+  const breadcrumbList = generateBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: categoryLabel === "Movie" ? "Movies" : (categoryLabel === "TV Show" ? "TV Shows" : categoryLabel), path: `/${type}` },
+    { name: title, path: canonicalPath }
+  ]);
+
+  const combinedJsonLd = jsonLd ? [jsonLd, breadcrumbList] : breadcrumbList;
+
+  const seoDescription = media.overview 
+    ? truncateDescription(media.overview)
+    : `Explore ${title} ${categoryLabel.toLowerCase()} details, cast, ratings, trailers, similar titles and recommendations.`;
+
+  const ogImageUrl = media.backdrop_path 
+    ? `https://image.tmdb.org/t/p/w780${media.backdrop_path}`
+    : (media.poster_path ? `https://image.tmdb.org/t/p/w500${media.poster_path}` : undefined);
 
   return (
     <div className="min-h-screen bg-black text-white pb-16 font-[Inter]">
+      <SEOHead
+        title={seoTitle}
+        description={seoDescription}
+        keywords={keywords}
+        canonicalPath={canonicalPath}
+        ogType={type === "movie" ? "video.movie" : "video.tv_show"}
+        ogImage={ogImageUrl}
+        jsonLd={combinedJsonLd}
+      />
       {/* Hero Backdrop Banner */}
       <div className="relative w-full min-h-[60vh] md:min-h-[75vh] flex items-end pt-36 md:pt-44">
         {backdropPath ? (
@@ -952,7 +1025,7 @@ const DetailsPage = ({ type: propType }) => {
                   return (
                     <SwiperSlide key={actor.id} style={{ width: "128px" }}>
                       <Link
-                        to={`/person/${actor.id}`}
+                        to={`/person/${generateSlug(actor.name, actor.id)}`}
                         className="group flex flex-col gap-2 cursor-pointer"
                       >
                         <div className="aspect-[2/3] rounded-lg overflow-hidden border border-white/10 bg-gray-950 shadow-md">
@@ -1195,7 +1268,7 @@ const DetailsPage = ({ type: propType }) => {
         )}
       </div>
 
-      {/* Similar & Recommendations Slider lists (Only for Movies and Anime Recommendations if Anime) */}
+      {/* Similar & Recommendations Slider lists */}
       <div className="mt-6">
         {(type === "movie" || type === "cartoon") && media.similar?.results && media.similar.results.length > 0 && (
           <MediaSlider
@@ -1215,7 +1288,7 @@ const DetailsPage = ({ type: propType }) => {
 
         {(type === "movie" || type === "cartoon") && media.recommendations?.results && media.recommendations.results.length > 0 && (
           <MediaSlider
-            title="Recommendations"
+            title="People also watched"
             items={media.recommendations.results}
             type={type}
           />
@@ -1223,7 +1296,7 @@ const DetailsPage = ({ type: propType }) => {
 
         {(type === "tv" || type === "web-series") && media.recommendations?.results && media.recommendations.results.length > 0 && (
           <MediaSlider
-            title="Recommendations"
+            title="People also watched"
             items={media.recommendations.results.filter(item => !item.genre_ids || !item.genre_ids.includes(16))}
             type={type}
           />
@@ -1231,12 +1304,123 @@ const DetailsPage = ({ type: propType }) => {
 
         {type === "anime" && media.recommendations?.results && media.recommendations.results.length > 0 && (
           <MediaSlider
-            title="Anime Recommendations"
+            title="People also watched"
             items={media.recommendations.results.filter(item => item.genre_ids && item.genre_ids.includes(16))}
             type={type}
           />
         )}
       </div>
+
+      {/* Dynamic SEO Internal Linking System */}
+      <div className="max-w-6xl mx-auto px-6 md:px-12 mt-12 pt-8 border-t border-gray-800 space-y-10">
+        
+        {/* Movies Like This (Text-based links for search crawlers) */}
+        {media.similar?.results && media.similar.results.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <span className="w-1 h-5 bg-yellow-400 rounded-full"></span>
+              {type === "movie" ? "Movies Like This" : "Shows Like This"}
+            </h3>
+            <div className="flex flex-wrap gap-2 text-sm text-gray-400">
+              {media.similar.results.slice(0, 10).map((item, idx) => {
+                const itemTitle = item.title || item.name;
+                const slug = generateSlug(itemTitle, item.id);
+                return (
+                  <React.Fragment key={item.id}>
+                    <Link to={`/${type}/${slug}`} className="hover:text-yellow-400 transition font-medium">
+                      {itemTitle}
+                    </Link>
+                    {idx < Math.min(media.similar.results.length, 10) - 1 && <span>•</span>}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* More From Same Genre */}
+        {genres.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <span className="w-1 h-5 bg-yellow-400 rounded-full"></span>
+              More From Same Genre
+            </h3>
+            <div className="flex flex-wrap gap-3">
+              {genres.map((g) => {
+                const pathType = type === "movie" ? "movies" : (type === "web-series" ? "web-series" : type);
+                return (
+                  <Link
+                    key={g.id}
+                    to={`/${pathType}/popular?genre=${g.id}`}
+                    className="bg-[#111] hover:bg-[#222] border border-gray-800 hover:border-yellow-400 text-gray-300 hover:text-yellow-400 text-xs sm:text-sm px-4 py-2 rounded-xl transition duration-200"
+                  >
+                    Best {g.name} {type === "movie" ? "Movies" : "Shows"}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* More From Same Director */}
+        {director && (
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <span className="w-1 h-5 bg-yellow-400 rounded-full"></span>
+              More From Same Director
+            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <Link
+                to={`/person/${generateSlug(director.name, director.id)}`}
+                className="inline-flex items-center gap-3 bg-[#111] hover:bg-[#222] border border-gray-800 hover:border-yellow-400 text-gray-300 hover:text-yellow-400 px-5 py-3 rounded-xl transition duration-200 w-fit"
+              >
+                {director.profile_path && (
+                  <img
+                    src={`https://image.tmdb.org/t/p/w185${director.profile_path}`}
+                    alt={director.name}
+                    className="w-10 h-10 rounded-full object-cover border border-white/10"
+                    loading="lazy"
+                  />
+                )}
+                <div className="text-left">
+                  <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Director</p>
+                  <p className="font-bold text-sm">{director.name}</p>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-yellow-400 ml-2">
+                  <path d="M16.1716 10.9999L10.8076 5.63589L12.2218 4.22168L20 11.9999L12.2218 19.778L10.8076 18.3638L16.1716 12.9999H4V10.9999H16.1716Z"></path>
+                </svg>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Entertainment Categories & Global Internal Navigation */}
+        <div className="space-y-4 pt-4">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <span className="w-1 h-5 bg-yellow-400 rounded-full"></span>
+            Explore Entertainment
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            <Link to="/movies/trending" className="block bg-[#111] hover:bg-[#222] border border-gray-800 hover:border-yellow-400 p-4 rounded-xl text-center transition duration-200">
+              <p className="text-sm font-bold text-white">Trending Movies</p>
+              <p className="text-xs text-gray-500 mt-1">What's hot today</p>
+            </Link>
+            <Link to="/movies/new-releases" className="block bg-[#111] hover:bg-[#222] border border-gray-800 hover:border-yellow-400 p-4 rounded-xl text-center transition duration-200">
+              <p className="text-sm font-bold text-white">Latest Releases</p>
+              <p className="text-xs text-gray-500 mt-1">Newly added movies</p>
+            </Link>
+            <Link to="/movies/top-rated" className="block bg-[#111] hover:bg-[#222] border border-gray-800 hover:border-yellow-400 p-4 rounded-xl text-center transition duration-200">
+              <p className="text-sm font-bold text-white">Top Rated Movies</p>
+              <p className="text-xs text-gray-500 mt-1">All-time masterpieces</p>
+            </Link>
+            <Link to="/explore" className="block bg-[#111] hover:bg-[#222] border border-gray-800 hover:border-yellow-400 p-4 rounded-xl text-center transition duration-200">
+              <p className="text-sm font-bold text-white">Interactive Catalog</p>
+              <p className="text-xs text-gray-500 mt-1">3D catalog search</p>
+            </Link>
+          </div>
+        </div>
+      </div>
+
 
       {/* Premium Media Player Modal Overlay */}
       {playingVideo && (

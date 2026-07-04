@@ -10,6 +10,8 @@ import HeroSlider from "../components/HeroSlider";
 import MediaSlider from "../components/MediaSlider";
 import LazyMediaRow from "../components/LazyMediaRow";
 import Loader from "../components/Loader";
+import { SEOHead, generateBreadcrumbJsonLd } from "../seo";
+
 
 const TVPage = () => {
   const navigate = useNavigate();
@@ -47,6 +49,13 @@ const TVPage = () => {
 
   return (
     <div className="min-h-screen bg-black text-white pb-12 select-none font-[Inter]">
+      <SEOHead
+        title="Browse TV Shows — Popular, Trending & Top Rated"
+        description="Explore the best collection of TV series and shows online. Stream trending, top-rated, comedy, drama, and reality series on MoviGenix."
+        keywords="watch TV shows, best TV shows, top rated TV shows, trending TV series, TV recommendations, stream shows"
+        canonicalPath="/tv"
+        jsonLd={generateBreadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "TV Shows", path: "/tv" }])}
+      />
       {/* Hero Section */}
       <HeroSlider items={heroItems.length > 0 ? heroItems : []} type="tv" />
 

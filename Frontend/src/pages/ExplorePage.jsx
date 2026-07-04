@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import InfiniteMenu from "../components/InfiniteMenu";
 import Loader from "../components/Loader";
 import { getPopularMovies, getBollywoodMovies, getTollywoodMovies } from "../services/api";
+import { SEOHead, generateBreadcrumbJsonLd } from "../seo";
+
 
 const ExplorePage = () => {
   const navigate = useNavigate();
@@ -101,6 +103,13 @@ const ExplorePage = () => {
 
   return (
     <div className="w-screen h-screen bg-black overflow-hidden relative">
+      <SEOHead
+        title="Explore Movies & TV Shows"
+        description="Interact with our immersive 3D cylinder movie catalog. Drag to spin, explore details, and find your next watch on MoviGenix."
+        keywords="explore movies, movie catalog, 3D movie catalog, interactive movie search, movie discovery"
+        canonicalPath="/explore"
+        jsonLd={generateBreadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Explore", path: "/explore" }])}
+      />
       {/* Immersive 3D Cylinder Catalog */}
       <div className="w-full h-full">
         <InfiniteMenu

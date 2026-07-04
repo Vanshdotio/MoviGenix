@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ProgressiveImage from "./ProgressiveImage";
 import { isUpcomingContent, formatReleaseDate } from "../utils/releaseUtils";
+import { generateSlug } from "../seo";
 
 const MovieCard = ({ movie, type = "movie" }) => {
   const navigate = useNavigate();
@@ -38,7 +39,7 @@ const MovieCard = ({ movie, type = "movie" }) => {
     e.preventDefault();
     e.stopPropagation();
     if (upcoming) return; // Block play for unreleased content
-    navigate(`/${cardType}/${movie.id}`, { state: { autoplay: true } });
+    navigate(`/${cardType}/${generateSlug(title, movie.id)}`, { state: { autoplay: true } });
   };
 
   const handleWatchlistClick = async (e) => {
@@ -64,7 +65,7 @@ const MovieCard = ({ movie, type = "movie" }) => {
 
   return (
     <Link
-      to={`/${cardType}/${movie.id}`}
+      to={`/${cardType}/${generateSlug(title, movie.id)}`}
       className="group block bg-[#111] rounded-xl overflow-hidden 
                  shadow-md md:hover:shadow-2xl md:hover:-translate-y-1.5 
                  transition-all duration-300 cursor-pointer"

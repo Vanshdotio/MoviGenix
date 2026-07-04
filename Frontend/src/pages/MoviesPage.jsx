@@ -14,6 +14,8 @@ import {
 } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import HeroSlider from "../components/HeroSlider";
+import { SEOHead, generateBreadcrumbJsonLd } from "../seo";
+
 import MediaSlider from "../components/MediaSlider";
 import MovieCard from "../components/MovieCard";
 import Loader from "../components/Loader";
@@ -134,6 +136,13 @@ const MoviesPage = () => {
 
   return (
     <div className="min-h-screen bg-black text-white pb-12 select-none font-[Inter]">
+      <SEOHead
+        title="Browse Movies — Popular, Trending & Top Rated"
+        description="Browse the best collection of movies online. Explore trending, top-rated, latest releases, award-winning films, and hidden gems on MoviGenix."
+        keywords="watch movies, best movies, top rated movies, trending movies, movie recommendation, streaming movies"
+        canonicalPath="/movies"
+        jsonLd={generateBreadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Movies", path: "/movies" }])}
+      />
       {/* Hero Section */}
       <HeroSlider items={trendingMovies.length > 0 ? trendingMovies : topRatedMovies} type="movie" />
 

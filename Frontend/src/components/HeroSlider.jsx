@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
+import { Helmet } from "react-helmet-async";
+import { generateSlug } from "../seo";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
@@ -60,8 +62,20 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
     });
   };
 
+  const firstItem = heroItems[0];
+  const firstBackdrop = firstItem
+    ? (firstItem.backdrop_path 
+        ? `https://image.tmdb.org/t/p/w780${firstItem.backdrop_path}` 
+        : `https://image.tmdb.org/t/p/w780${firstItem.poster_path}`)
+    : "";
+
   return (
     <div className="relative w-full h-[100vh] md:h-[85vh] bg-black">
+      {firstBackdrop && (
+        <Helmet>
+          <link rel="preload" as="image" href={firstBackdrop} fetchpriority="high" />
+        </Helmet>
+      )}
       <Swiper
         autoplay={{ delay: 8000, disableOnInteraction: false }}
         pagination={{ clickable: true }}
@@ -203,7 +217,7 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                           {isInWatchlist(item.id) ? "In Watchlist" : "Add to List"}
                         </button>
                         <Link
-                          to={`/${type}/${item.id}`}
+                          to={`/${type}/${generateSlug(item.title || item.name, item.id)}`}
                           className="cursor-pointer flex items-center gap-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-white px-6 py-3 font-semibold rounded-xl transition duration-200 active:scale-95 shadow-lg font-[Inter]"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-5 h-5" strokeLinecap="round" strokeLinejoin="round">
@@ -218,7 +232,7 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                       /* Released: Watch Now + More Info */
                       <>
                         <Link
-                          to={`/${type}/${item.id}`}
+                          to={`/${type}/${generateSlug(item.title || item.name, item.id)}`}
                           className="cursor-pointer flex items-center gap-2 bg-[#ffc600] hover:bg-[#e0af00] text-black px-6 py-3 font-bold rounded-xl transition duration-200 active:scale-95 shadow-lg font-[Inter]"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -227,7 +241,7 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                           Watch Now
                         </Link>
                         <Link
-                          to={`/${type}/${item.id}`}
+                          to={`/${type}/${generateSlug(item.title || item.name, item.id)}`}
                           className="cursor-pointer flex items-center gap-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-white px-6 py-3 font-semibold rounded-xl transition duration-200 active:scale-95 shadow-lg font-[Inter]"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-5 h-5" strokeLinecap="round" strokeLinejoin="round">
@@ -328,7 +342,7 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                       </button>
                     ) : (
                       <Link
-                        to={`/${type}/${item.id}`}
+                        to={`/${type}/${generateSlug(item.title || item.name, item.id)}`}
                         className="flex items-center gap-2 bg-[#ffc600] hover:bg-[#e0af00] text-black px-8 py-3.5 font-bold rounded-full transition duration-200 active:scale-95 shadow-xl font-[Inter] text-sm"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -340,7 +354,7 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
 
                     {/* Details Button */}
                     <Link
-                      to={`/${type}/${item.id}`}
+                      to={`/${type}/${generateSlug(item.title || item.name, item.id)}`}
                       className="flex flex-col items-center gap-1.5 group"
                     >
                       <div className="w-11 h-11 rounded-full border-2 border-white/40 bg-white/10 flex items-center justify-center text-white group-active:scale-90 transition-all duration-200">

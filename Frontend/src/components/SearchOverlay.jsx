@@ -1,17 +1,33 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { searchMedia } from "../services/api";
 import { trackSearch } from "../services/telemetry";
 import { useAuth } from "../context/AuthContext";
+import { SEOHead, generateBreadcrumbJsonLd } from "../seo";
+
 
 const SearchOverlay = () => {
-  const [text, setText] = useState("");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const qParam = queryParams.get("q") || queryParams.get("query") || "";
+
+  const [text, setText] = useState(qParam);
   const [searchType, setSearchType] = useState("movie"); // 'movie', 'tv', 'anime', 'cartoon'
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const { contentPreferences } = useAuth();
   const showAnime = contentPreferences?.showAnime ?? true;
+
+  // Sync text when URL search param changes
+  useEffect(() => {
+    const qParams = new URLSearchParams(location.search);
+    const qVal = qParams.get("q") || qParams.get("query") || "";
+    if (qVal !== text) {
+      setText(qVal);
+    }
+  }, [location.search]);
 
   // Reset search type if current category is disabled
   useEffect(() => {
@@ -36,6 +52,10 @@ const SearchOverlay = () => {
       }
       if (!text.trim()) {
         setResults([]);
+        const qParams = new URLSearchParams(window.location.search);
+        if (qParams.get("q")) {
+          navigate("/search", { replace: true });
+        }
         return;
       }
 
@@ -47,6 +67,12 @@ const SearchOverlay = () => {
         const searchResults = data.results || [];
         setResults(searchResults);
         trackSearch(text, searchResults.length);
+
+        const qParams = new URLSearchParams(window.location.search);
+        const currentQ = qParams.get("q") || "";
+        if (text !== currentQ) {
+          navigate(`/search?q=${encodeURIComponent(text)}`, { replace: true });
+        }
       } catch (err) {
         console.error("Error searching media:", err);
         setResults([]);
@@ -100,6 +126,17 @@ const SearchOverlay = () => {
 
   return (
     <div className="relative w-full text-white pt-24 font-[Inter] min-h-screen bg-black select-none">
+      <SEOHead
+        title={text.trim() ? `Search Results for "${text}"` : "Search Movies, TV Shows, Anime & Cartoons"}
+        description={text.trim() ? `Browse search results for "${text}" on MoviGenix.` : "Search for your favorite movies, TV series, anime, cartoons, and directors on MoviGenix."}
+        keywords="search movies, search tv shows, search anime, search cartoons, MoviGenix search"
+        canonicalPath={text.trim() ? `/search?q=${encodeURIComponent(text)}` : "/search"}
+        noIndex={true}
+        jsonLd={generateBreadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: "Search", path: "/search" }
+        ])}
+      />
       {/* Header with Back Button */}
       <div className="flex items-center gap-4 px-6 md:px-10 mb-6">
         <button

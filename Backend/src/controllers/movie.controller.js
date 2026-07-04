@@ -296,6 +296,60 @@ const fetchWithRetry = async (url, options = {}, retries = 3, delayMs = 200) => 
 };
 
 /**
+ * Resolves a text slug to a numeric TMDB ID using the Search API.
+ */
+const resolveSlugToId = async (slug, type) => {
+  if (!slug) return "";
+  if (/^\d+$/.test(String(slug))) {
+    return String(slug);
+  }
+
+  const query = String(slug).replace(/-/g, " ");
+  const actualType = (type === "anime" || type === "web-series" || type === "webSeries" || type === "cartoon") ? "tv" : type;
+  
+  const searchUrl = `${TMDB_BASE_URL}/search/${actualType}`;
+  
+  try {
+    const searchRes = await fetchWithRetry(
+      searchUrl,
+      getParams({ query, language: "en-US", page: 1 })
+    );
+
+    const results = searchRes?.data?.results || [];
+    if (results.length === 0) {
+      throw new Error(`Content not found for slug: ${slug}`);
+    }
+
+    const backendSlugify = (text) => {
+      if (!text) return "";
+      return String(text)
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, "")
+        .replace(/[\s_]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    };
+
+    const cleanSlug = backendSlugify(slug);
+    let bestMatch = results[0];
+
+    for (const item of results) {
+      const itemTitle = item.title || item.name || "";
+      if (backendSlugify(itemTitle) === cleanSlug) {
+        bestMatch = item;
+        break;
+      }
+    }
+
+    return String(bestMatch.id);
+  } catch (error) {
+    console.error(`Error resolving slug "${slug}" to ID:`, error.message);
+    throw error;
+  }
+};
+
+/**
  * Minimize response payload size by stripping out unused fields for slider lists
  */
 const minimizeMediaItem = (item, defaultType = "movie") => {
@@ -1195,7 +1249,17 @@ const searchCartoon = async (req, res) => {
 
 const getCartoonDetails = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id: rawId } = req.params;
+    let id = rawId;
+    
+    if (!/^\d+$/.test(rawId)) {
+      try {
+        id = await resolveSlugToId(rawId, "tv");
+      } catch (err) {
+        id = await resolveSlugToId(rawId, "movie");
+      }
+    }
+    
     let mediaData;
     let isTv = true;
     try {
@@ -1261,7 +1325,8 @@ const getCartoonDetails = async (req, res) => {
 
 const getMovieDetails = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id: rawId } = req.params;
+    const id = await resolveSlugToId(rawId, "movie");
     const rating = await getOrFetchContentRating(id, "movie");
     if (isAccessDenied(rating, req.user)) {
       return res.status(403).json({ error: "Age Restricted", isAdultContent: true });
@@ -1315,7 +1380,8 @@ const getMovieDetails = async (req, res) => {
 
 const getTVDetails = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id: rawId } = req.params;
+    const id = await resolveSlugToId(rawId, "tv");
     const rating = await getOrFetchContentRating(id, "tv");
     if (isAccessDenied(rating, req.user)) {
       return res.status(403).json({ error: "Age Restricted", isAdultContent: true });
@@ -1388,7 +1454,8 @@ const getTVSeasonDetails = async (req, res) => {
 
 const getPersonDetails = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id: rawId } = req.params;
+    const id = await resolveSlugToId(rawId, "person");
     const response = await fetchWithRetry(
       `${TMDB_BASE_URL}/person/${id}`,
       getParams({ append_to_response: "images,combined_credits", language: "en-US" })

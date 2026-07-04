@@ -20,6 +20,8 @@ import { useAuth } from "../context/AuthContext";
 import HeroSlider from "../components/HeroSlider";
 import MediaSlider from "../components/MediaSlider";
 import Loader from "../components/Loader";
+import { SEOHead, generateBreadcrumbJsonLd } from "../seo";
+
 
 const AnimePage = () => {
   const navigate = useNavigate();
@@ -107,6 +109,13 @@ const AnimePage = () => {
 
   return (
     <div className="min-h-screen bg-black text-white pb-12 select-none font-[Inter]">
+      <SEOHead
+        title="Browse Anime — Popular, Trending & Top Rated"
+        description="Stream the best anime series online. Explore trending, popular, top-rated, subbed, and dubbed anime on MoviGenix."
+        keywords="watch anime, anime online, stream anime, best anime, top rated anime, subbed anime, dubbed anime, MoviGenix"
+        canonicalPath="/anime"
+        jsonLd={generateBreadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Anime", path: "/anime" }])}
+      />
       {/* Hero Section */}
       <HeroSlider items={trendingAnime.length > 0 ? trendingAnime : topRatedAnime} type="anime" />
 

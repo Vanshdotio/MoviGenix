@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   getPopularMovies,
@@ -63,6 +63,8 @@ import {
 import MovieCard from "../components/MovieCard";
 import Loader from "../components/Loader";
 import { OrbitProgress } from "react-loading-indicators";
+import { SEOHead, generateBreadcrumbJsonLd } from "../seo";
+
 
 const SECTION_MAP = {
   movies: {
@@ -159,9 +161,20 @@ const SectionPage = ({ type: propType }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const genreParam = queryParams.get("genre") || "";
+
   const [items, setItems] = useState([]);
   const [genres, setGenres] = useState([]);
-  const [selectedGenre, setSelectedGenre] = useState("");
+  const [selectedGenre, setSelectedGenre] = useState(genreParam);
+
+  useEffect(() => {
+    const qParams = new URLSearchParams(location.search);
+    const gParam = qParams.get("genre") || "";
+    setSelectedGenre(gParam);
+  }, [location.search]);
+
   const [sortBy, setSortBy] = useState("popularity");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -363,8 +376,21 @@ const SectionPage = ({ type: propType }) => {
 
   const cardType = type === "movies" ? "movie" : (type === "cartoon" ? "cartoon" : (type === "anime" ? "anime" : (type === "web-series" ? "web-series" : "tv")));
 
+  const sectionPath = `/${type}/${section}`;
+
   return (
     <div className="min-h-screen bg-black text-white pb-20 pt-20 px-6 md:px-12 select-none font-[Inter]">
+      <SEOHead
+        title={sectionConfig.title}
+        description={sectionConfig.desc}
+        keywords={`${sectionConfig.title}, best ${sectionConfig.title}, watch ${sectionConfig.title} online, MoviGenix`}
+        canonicalPath={sectionPath}
+        jsonLd={generateBreadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: type.charAt(0).toUpperCase() + type.slice(1), path: `/${type}` },
+          { name: sectionConfig.title, path: sectionPath }
+        ])}
+      />
       {/* Header Back & Info */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/10 pb-6 mb-8">
         <div className="flex items-start gap-4">

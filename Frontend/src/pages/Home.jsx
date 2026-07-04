@@ -22,8 +22,10 @@ import {
   getBollywoodMovies,
   getTollywoodMovies,
 } from "../services/api";
+import { SEOHead, generateWebsiteJsonLd, generateOrganizationJsonLd } from "../seo";
 
 const Home = () => {
+
   const navigate = useNavigate();
   const { user, contentPreferences } = useAuth();
   const showAnime = contentPreferences?.showAnime ?? true;
@@ -84,6 +86,9 @@ const Home = () => {
 
   return (
     <div className="bg-black min-h-screen w-full pb-20 text-white font-[Inter] overflow-x-hidden">
+      <SEOHead 
+        jsonLd={[generateWebsiteJsonLd(), generateOrganizationJsonLd()]}
+      />
       {/* Hero Featured Video Banner */}
       <HeroSlider items={trending} type="movie" />
 

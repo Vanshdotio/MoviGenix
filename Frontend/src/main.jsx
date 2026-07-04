@@ -6,6 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 import Loader from "./components/Loader";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./context/AuthContext";
+import { HelmetProvider } from "react-helmet-async";
 
 const App = React.lazy(() => import("./App.jsx"));
 const GOOGLE_CLIENT_ID = "966319354665-nqevmcplc0tr3qd886183gf98trjdcuu.apps.googleusercontent.com";
@@ -13,11 +14,14 @@ const GOOGLE_CLIENT_ID = "966319354665-nqevmcplc0tr3qd886183gf98trjdcuu.apps.goo
 createRoot(document.getElementById("root")).render(
   <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
     <BrowserRouter>
-      <AuthProvider>
-        <Suspense fallback={<Loader />}>
-          <App />
-        </Suspense>
-      </AuthProvider>
+      <HelmetProvider>
+        <AuthProvider>
+          <Suspense fallback={<Loader />}>
+            <App />
+          </Suspense>
+        </AuthProvider>
+      </HelmetProvider>
     </BrowserRouter>
   </GoogleOAuthProvider>
 );
+

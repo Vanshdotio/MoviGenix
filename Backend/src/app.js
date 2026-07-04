@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth.routes');
 const adminRoutes = require('./routes/admin.routes');
 const telemetryRoutes = require('./routes/telemetry.routes');
 const adsRoutes = require('./routes/ads.routes');
+const sitemapRoutes = require('./routes/sitemap.routes');
 const path = require('path');
 const performanceMiddleware = require('./middlewares/performance');
 const errorMiddleware = require('./middlewares/error');
@@ -57,6 +58,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/telemetry', telemetryRoutes);
 app.use('/api/ads', adsRoutes);
+app.use('/', sitemapRoutes);
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
 // Global Error Handler

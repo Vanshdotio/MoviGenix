@@ -9,6 +9,8 @@ import HeroSlider from "../components/HeroSlider";
 import MediaSlider from "../components/MediaSlider";
 import LazyMediaRow from "../components/LazyMediaRow";
 import Loader from "../components/Loader";
+import { SEOHead, generateBreadcrumbJsonLd } from "../seo";
+
 
 const WebSeries = () => {
   const navigate = useNavigate();
@@ -46,6 +48,13 @@ const WebSeries = () => {
 
   return (
     <div className="min-h-screen bg-black text-white pb-12 select-none font-[Inter]">
+      <SEOHead
+        title="Browse Web Series — Popular, Trending & Top Rated"
+        description="Stream the best web series online. Explore trending, popular, top-rated, international, and regional web series on MoviGenix."
+        keywords="watch web series, best web series, top rated web series, trending web series, stream web series, MoviGenix"
+        canonicalPath="/web-series"
+        jsonLd={generateBreadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Web Series", path: "/web-series" }])}
+      />
       {/* Hero Section */}
       <HeroSlider items={heroItems.length > 0 ? heroItems : []} type="web-series" />
 

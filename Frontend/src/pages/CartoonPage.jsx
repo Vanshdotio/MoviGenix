@@ -19,6 +19,8 @@ import { useAuth } from "../context/AuthContext";
 import HeroSlider from "../components/HeroSlider";
 import MediaSlider from "../components/MediaSlider";
 import Loader from "../components/Loader";
+import { SEOHead, generateBreadcrumbJsonLd } from "../seo";
+
 
 const CartoonPage = () => {
   const navigate = useNavigate();
@@ -103,6 +105,13 @@ const CartoonPage = () => {
 
   return (
     <div className="min-h-screen bg-black text-white pb-12 select-none font-[Inter]">
+      <SEOHead
+        title="Browse Cartoons — Popular, Trending & Top Rated"
+        description="Stream the best cartoons online. Explore trending, popular, top-rated, Hindi dubbed, and multi-audio cartoons on MoviGenix."
+        keywords="watch cartoons, best cartoons, top rated cartoons, trending cartoons, Hindi dubbed cartoons, cartoon recommendations, stream cartoons"
+        canonicalPath="/cartoon"
+        jsonLd={generateBreadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Cartoons", path: "/cartoon" }])}
+      />
       {/* Hero Section */}
       <HeroSlider items={trending.length > 0 ? trending : popular} type="cartoon" />
 

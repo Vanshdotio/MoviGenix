@@ -52,6 +52,7 @@ const ProgressiveImage = ({
         loading={loading}
         width={width}
         height={height}
+        decoding="async"
         className={`w-full h-full object-cover transition-opacity duration-500 ease-out ${
           isBlurry ? "opacity-0" : "opacity-100"
         }`}

@@ -6,6 +6,15 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   
+  server: {
+    proxy: {
+      '/sitemap.xml': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      }
+    }
+  },
+  
   build: {
     rollupOptions: {
       output: {

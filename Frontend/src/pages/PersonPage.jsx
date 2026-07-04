@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { getPersonDetails } from "../services/api";
 import Loader from "../components/Loader";
+import { SEOHead, generatePersonJsonLd, generatePersonKeywords, truncateDescription, generateSlug } from "../seo";
+
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/free-mode";
@@ -99,6 +101,14 @@ const PersonPage = () => {
 
   return (
     <div className="min-h-screen bg-black text-white pb-20 font-[Inter] pt-24">
+      <SEOHead
+        title={`${person.name} Movies, Biography & Filmography`}
+        description={truncateDescription(person.biography) || `Explore ${person.name} biography, filmography, pictures, and popular movies and TV series.`}
+        keywords={generatePersonKeywords(person)}
+        canonicalPath={`/person/${person.id}`}
+        ogImage={person.profile_path ? `https://image.tmdb.org/t/p/h632${person.profile_path}` : undefined}
+        jsonLd={generatePersonJsonLd(person)}
+      />
       {/* Back Button */}
       <div className="max-w-6xl mx-auto px-6 md:px-12 mb-6">
         <button
@@ -261,7 +271,7 @@ const PersonPage = () => {
                     return (
                       <SwiperSlide key={`${item.id}-${mediaType}`} style={{ width: "144px" }}>
                         <Link
-                          to={`/${mediaType}/${item.id}`}
+                          to={`/${mediaType}/${generateSlug(item.title || item.name, item.id)}`}
                           className="group flex flex-col gap-2 cursor-pointer"
                         >
                           <div className="aspect-[2/3] rounded-lg overflow-hidden border border-white/15 bg-gray-950 shadow-md relative">
@@ -321,7 +331,7 @@ const PersonPage = () => {
                         {/* Title & Character Link */}
                         <div className="flex-1 min-w-0">
                           <Link
-                            to={`/${mediaType}/${item.id}`}
+                            to={`/${mediaType}/${generateSlug(item.title || item.name, item.id)}`}
                             className="font-semibold text-gray-200 hover:text-yellow-400 transition text-sm md:text-base block truncate"
                           >
                             {title}
