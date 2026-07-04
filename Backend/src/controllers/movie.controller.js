@@ -1805,6 +1805,15 @@ const getAnimeCollection = async (req, res) => {
 
 const PLAYER_PRIORITY = ["ScreenScape", "VidKing", "VidCore", "VidFast", "VidSuper"];
 
+// Map frontend server IDs to internal player names
+const SERVER_TO_PLAYER = {
+  main: "VidKing",
+  scape: "ScreenScape",
+  core: "VidCore",
+  fast: "VidFast",
+  super: "VidSuper"
+};
+
 const PLAYER_LANGUAGES = {
   ScreenScape: ["hi", "te", "ta", "ml"],      // Regional/Indian languages
   VidKing: ["en", "hi", "te", "ta", "ml", "kn", "pa", "fr", "es", "de", "ja", "ko", "zh"], // Main multi-language server
@@ -1830,7 +1839,12 @@ const getScreenScapeLang = (iso) => {
   return mapping[iso] || iso;
 };
 
-const selectPlayerForLanguage = (selectedLang, excludeList = []) => {
+const selectPlayerForLanguage = (selectedLang, excludeList = [], forcedServer = null) => {
+  // If user explicitly chose a server, force that player
+  if (forcedServer && SERVER_TO_PLAYER[forcedServer]) {
+    return SERVER_TO_PLAYER[forcedServer];
+  }
+
   const lang = selectedLang ? selectedLang.toLowerCase() : "en";
   
   // First, find a player supporting the requested language that is not excluded
@@ -1854,7 +1868,7 @@ const selectPlayerForLanguage = (selectedLang, excludeList = []) => {
 const getSecureMoviePlayerUrl = async (req, res) => {
   try {
     const { id } = req.params;
-    const { audio = "en", progress = 0, exclude = "" } = req.query;
+    const { audio = "en", progress = 0, exclude = "", server = "" } = req.query;
 
     if (!id) {
       return res.status(400).json({ error: "Movie ID is required" });
@@ -1865,9 +1879,10 @@ const getSecureMoviePlayerUrl = async (req, res) => {
       return res.status(403).json({ error: "Access denied. This content is age restricted.", isAdultContent: true });
     }
 
-    // Smart Player Selection
+    // Smart Player Selection (forced if user picked a specific server)
     const excludeList = exclude ? exclude.split(",") : [];
-    const player = selectPlayerForLanguage(audio, excludeList);
+    const forcedServer = server && SERVER_TO_PLAYER[server] ? server : null;
+    const player = selectPlayerForLanguage(audio, excludeList, forcedServer);
     if (!player) {
       return res.json({ error: "No playback sources found for this content" });
     }
@@ -1911,7 +1926,7 @@ const getSecureMoviePlayerUrl = async (req, res) => {
 const getSecureTVPlayerUrl = async (req, res) => {
   try {
     const { id, season, episode } = req.params;
-    const { audio = "en", progress = 0, exclude = "" } = req.query;
+    const { audio = "en", progress = 0, exclude = "", server = "" } = req.query;
 
     if (!id || !season || !episode) {
       return res.status(400).json({ error: "Show ID, season, and episode are required" });
@@ -1922,9 +1937,10 @@ const getSecureTVPlayerUrl = async (req, res) => {
       return res.status(403).json({ error: "Access denied. This content is age restricted.", isAdultContent: true });
     }
 
-    // Smart Player Selection
+    // Smart Player Selection (forced if user picked a specific server)
     const excludeList = exclude ? exclude.split(",") : [];
-    const player = selectPlayerForLanguage(audio, excludeList);
+    const forcedServer = server && SERVER_TO_PLAYER[server] ? server : null;
+    const player = selectPlayerForLanguage(audio, excludeList, forcedServer);
     if (!player) {
       return res.json({ error: "No playback sources found for this content" });
     }

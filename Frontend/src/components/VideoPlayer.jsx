@@ -216,7 +216,7 @@ const VideoPlayer = ({
   const [showEpisodesMenu, setShowEpisodesMenu] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState(null);
   const [selectedServer, setSelectedServer] = useState(() => {
-    return localStorage.getItem("movigenix_server") || "vidking";
+    return localStorage.getItem("movigenix_server") || "main";
   });
   const [showServerMenu, setShowServerMenu] = useState(false);
 
@@ -1256,7 +1256,7 @@ const VideoPlayer = ({
                 <path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"/>
                 <path d="M12 6c-3.309 0-6 2.691-6 6s2.691 6 6 6 6-2.691 6-6-2.691-6-6-6zm0 10c-2.206 0-4-1.794-4-4s1.794-4 4-4 4 1.794 4 4-1.794 4-4 4z"/>
               </svg>
-              <span>Server: {selectedServer === "vidking" ? "Main" : selectedServer === "vidsrc" ? "Server 2" : "Server 3"}</span>
+              <span>Server: {{ main: "Main", scape: "Scape", core: "Core", fast: "Fast", super: "Super" }[selectedServer] || "Main"}</span>
             </button>
             {showServerMenu && (
               <div className="absolute top-full right-0 mt-3 w-48 rounded-xl bg-zinc-950/95 border border-white/10 backdrop-blur-2xl shadow-2xl py-1 z-[50]">
@@ -1264,9 +1264,11 @@ const VideoPlayer = ({
                   Choose Server
                 </div>
                 {[
-                  { id: "vidking", name: "Main Server" },
-                  { id: "vidsrc", name: "Server 2 (Backup)" },
-                  { id: "vidlink", name: "Server 3 (Fast)" },
+                  { id: "main", name: "Main Server" },
+                  { id: "scape", name: "Server 2 (Scape)" },
+                  { id: "core", name: "Server 3 (Core)" },
+                  { id: "fast", name: "Server 4 (Fast)" },
+                  { id: "super", name: "Server 5 (Super)" },
                 ].map((srv) => {
                   const isCurrent = srv.id === selectedServer;
                   return (

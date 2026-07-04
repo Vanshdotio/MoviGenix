@@ -1,47 +1,43 @@
- # Dependencies
-   Backend/node_modules/
-    node_modules/
-    */node_modules/
+# Dependencies
+Backend/node_modules/
+node_modules/
+*/node_modules/
 
-    # Environment files
-    .env
-    .env.*
-    *.env
+# Environment files
+.env
+.env.*
+*.env
 
-    # Google OAuth secrets
-    Backend/client_secret*.json
-    client_secret_*.json
+# Google OAuth secrets
+Backend/client_secret*.json
+client_secret_*.json
 
-    # Logs
-    logs/
-    *.log
-    npm-debug.log*
-    yarn-debug.log*
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
 
-    # Build outputs
-    dist/
-    dist-ssr/
-    build/
-
-    # IDE / Editor
-    .vscode/
-    .idea/
-    *.suo
-    *.ntvs*
-    *.njsproj
-    *.sln
-    *.sw?
-    .DS_Store
-
-    # OS files
-    Thumbs.db
-    Desktop.ini
-
-    # Local config
-    *.local
-
-   markdown/
-   screenscapedocs.md
-   vidcoredocs.md
-   vidfastdocs.md
-   vidsuperdocs.md
+# Build outputs
+dist/
+dist-ssr/
+build/
+# IDE / Editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+# OS files
+Thumbs.db
+Desktop.ini
+# Local config
+*.local
+markdown/
+screenscapedocs.md
+vidcoredocs.md
+vidfastdocs.md
+vidsuperdocs.md
