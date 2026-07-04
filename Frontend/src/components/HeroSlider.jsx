@@ -95,6 +95,9 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                 {/* Dark Vignette Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent hidden lg:block"></div>
+                
+                {/* Bottom Blur Vignette for seamless transition */}
+                <div className="absolute bottom-0 left-0 right-0 h-44 bg-gradient-to-t from-black via-black/90 to-transparent backdrop-blur-[1.5px] pointer-events-none z-10"></div>
 
                 {/* Upcoming ribbon badge on hero image */}
                 {upcoming && (

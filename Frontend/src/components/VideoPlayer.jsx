@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   getSecurePlayerUrl,
+  getAvailableLanguages,
   getActiveAdsApi,
   trackAdViewApi,
   trackAdClickApi,
@@ -128,6 +129,22 @@ class AudioEnhancer {
   }
 }
 
+const ALL_LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "hi", name: "Hindi (Original)" },
+  { code: "te", name: "Telugu" },
+  { code: "ta", name: "Tamil" },
+  { code: "ml", name: "Malayalam" },
+  { code: "kn", name: "Kannada" },
+  { code: "pa", name: "Punjabi" },
+  { code: "fr", name: "French" },
+  { code: "es", name: "Spanish" },
+  { code: "de", name: "German" },
+  { code: "ja", name: "Japanese" },
+  { code: "ko", name: "Korean" },
+  { code: "zh", name: "Chinese" }
+];
+
 const VideoPlayer = ({
   type,
   id,
@@ -203,6 +220,18 @@ const VideoPlayer = ({
   });
   const [showServerMenu, setShowServerMenu] = useState(false);
 
+  // OTT Custom Language Selector States & Refs
+  const [switchingLanguage, setSwitchingLanguage] = useState(false);
+  const [switchingMessage, setSwitchingMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
+  const [languageSelected, setLanguageSelected] = useState(false);
+  const [failedPlayers, setFailedPlayers] = useState([]);
+
+  const langScrollRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
   const playerContainerRef = useRef(null);
   const iframeRef = useRef(null);
   const audioRef = useRef(null);
@@ -214,6 +243,8 @@ const VideoPlayer = ({
   const episodesMenuRef = useRef(null);
   const lastProgressSentTimeRef = useRef(0);
   const syncSettingsTimeoutRef = useRef(null);
+  const activePlayerRef = useRef(null);
+  const fallbackTimeoutRef = useRef(null);
 
   // Close menus on outside click
   useEffect(() => {
@@ -229,8 +260,34 @@ const VideoPlayer = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const clearFallbackTimeout = () => {
+    if (fallbackTimeoutRef.current) {
+      clearTimeout(fallbackTimeoutRef.current);
+      fallbackTimeoutRef.current = null;
+    }
+    setLanguageSelected(true);
+    console.log(`[Playback Verified] Playback verified for active player: ${activePlayerRef.current}`);
+  };
+
+  const startPlaybackCheck = (playerName, audioLang, progress, serverName) => {
+    if (fallbackTimeoutRef.current) {
+      clearTimeout(fallbackTimeoutRef.current);
+    }
+    
+    fallbackTimeoutRef.current = setTimeout(() => {
+      console.warn(`[Fallback Loop] Player "${playerName}" failed to start within timeout. Attempting fallback...`);
+      showToast(`Stream issue on "${playerName}". Checking backup...`);
+      
+      setFailedPlayers((prev) => {
+        const updated = [...prev, playerName];
+        fetchPlayerUrl(audioLang, progress, serverName, updated);
+        return updated;
+      });
+    }, 10000);
+  };
+
   // Build and fetch secure player URL
-  const fetchPlayerUrl = useCallback(async (audioLang, progress, serverName = selectedServer) => {
+  const fetchPlayerUrl = useCallback(async (audioLang, progress, serverName = selectedServer, excludeList = failedPlayers) => {
     try {
       setLoading(true);
       setError(null);
@@ -241,6 +298,10 @@ const VideoPlayer = ({
         autoplay: "1", // Auto play next/initial
         server: serverName,
       };
+
+      if (excludeList && excludeList.length > 0) {
+        params.exclude = excludeList.join(",");
+      }
       
       if (type !== "movie") {
         params.season = season;
@@ -254,8 +315,22 @@ const VideoPlayer = ({
       }
       
       const response = await getSecurePlayerUrl(type, id, params);
-      if (response && response.playerUrl) {
-        setPlayerUrl(response.playerUrl);
+      if (response && response.error) {
+        setError(response.error);
+        setLoading(false);
+        setSwitchingLanguage(false);
+        return;
+      }
+      
+      if (response && (response.embedUrl || response.playerUrl)) {
+        const nextUrl = response.embedUrl || response.playerUrl;
+        setPlayerUrl(nextUrl);
+        activePlayerRef.current = response.player;
+        if (response.language) {
+          setSelectedAudio(response.language);
+        }
+        
+        startPlaybackCheck(response.player, response.language || audioLang, progress, serverName);
       } else {
         setError("Failed to fetch streaming player source.");
       }
@@ -267,13 +342,115 @@ const VideoPlayer = ({
         setError("Failed to initialize player. Please try again.");
       }
     }
-  }, [type, id, season, episode, selectedServer]);
+  }, [type, id, season, episode, selectedServer, failedPlayers]);
+
+  const isLanguageSupported = (code) => {
+    if (availableLanguages && availableLanguages.length > 0) {
+      return availableLanguages.some(
+        (l) => l.iso_639_1 === code || l.code === code || l === code
+      );
+    }
+    const allSupported = ["en", "hi", "te", "ta", "ml", "kn", "pa", "fr", "es", "de", "ja", "ko", "zh"];
+    return allSupported.includes(code);
+  };
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage("");
+    }, 4000);
+  };
+
+  const handleLanguageSelect = async (langCode) => {
+    if (langCode === selectedAudio) return;
+    
+    // Hide controls immediately on selection so it disappears
+    setShowControls(false);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    
+    setLanguageSelected(true);
+    
+    try {
+      setSwitchingLanguage(true);
+      setSwitchingMessage("Switching Language...");
+      
+      const t1 = setTimeout(() => setSwitchingMessage("Finding Best Stream..."), 1200);
+      const t2 = setTimeout(() => setSwitchingMessage("Connecting..."), 2400);
+
+      const currentProgress = currentProgressRef.current || 0;
+      
+      const params = {
+        progress: Math.floor(currentProgress),
+        autoplay: "1",
+        audio: langCode
+      };
+      
+      if (type !== "movie") {
+        params.season = season;
+        params.episode = episode;
+      }
+      
+      const response = await getSecurePlayerUrl(type, id, params);
+      
+      clearTimeout(t1);
+      clearTimeout(t2);
+
+      if (response && response.error) {
+        showToast("Language unavailable: No player supports this language.");
+        setLanguageSelected(false);
+        setSwitchingLanguage(false);
+        return;
+      }
+      
+      if (response && (response.embedUrl || response.playerUrl)) {
+        setPlayerUrl(response.embedUrl || response.playerUrl);
+        setSelectedAudio(response.language || langCode);
+      } else {
+        showToast("Language switching failed.");
+        setLanguageSelected(false);
+        setSwitchingLanguage(false);
+      }
+    } catch (err) {
+      console.error("Error switching language:", err);
+      showToast("Failed to switch audio stream.");
+      setLanguageSelected(false);
+      setSwitchingLanguage(false);
+    }
+  };
+
+  const handleLangScrollWheel = (e) => {
+    if (langScrollRef.current) {
+      langScrollRef.current.scrollLeft += e.deltaY;
+    }
+  };
+
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setStartX(e.pageX - langScrollRef.current.offsetLeft);
+    setScrollLeft(langScrollRef.current.scrollLeft);
+  };
+
+  const handleMouseLeaveOrUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMoveDrag = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const x = e.pageX - langScrollRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    langScrollRef.current.scrollLeft = scrollLeft - walk;
+  };
 
   // Initial load
   useEffect(() => {
     setLoading(true);
     setPlayerUrl("");
-    fetchPlayerUrl(selectedAudio, initialProgress, selectedServer);
+    setLanguageSelected(false);
+    setFailedPlayers([]);
+    fetchPlayerUrl(selectedAudio, initialProgress, selectedServer, []);
   }, [type, id, season, episode]);
 
   // keydown Escape event listener to close player
@@ -409,6 +586,9 @@ const VideoPlayer = ({
       if (syncSettingsTimeoutRef.current) {
         clearTimeout(syncSettingsTimeoutRef.current);
       }
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -501,6 +681,9 @@ const VideoPlayer = ({
       try {
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
         if (!data || !data.event) return;
+
+        // Clear playback verification fallback since player is active
+        clearFallbackTimeout();
 
         const eventType = data.event;
         
@@ -601,6 +784,12 @@ const VideoPlayer = ({
 
   const handleIframeLoad = () => {
     setLoading(false);
+    setSwitchingLanguage(false);
+    setSwitchingMessage("");
+    setShowControls(false);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
     
     // Set initial volume immediately on load
     const scaledVol = getScaledVolume(volume, audioMode);
@@ -1213,6 +1402,88 @@ const VideoPlayer = ({
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Premium Language Switching Loading Overlay */}
+      {switchingLanguage && (
+        <div className="absolute inset-0 z-50 bg-black/95 flex flex-col items-center justify-center overflow-hidden transition-all duration-500 font-[Inter] backdrop-blur-md">
+          <div className="relative z-10 flex flex-col items-center gap-6 text-center px-6">
+            <div className="relative w-16 h-16 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-4 border-white/5 border-t-yellow-400 animate-spin"></div>
+            </div>
+            <div>
+              <span className="text-[10px] text-yellow-400 font-extrabold uppercase tracking-widest animate-pulse">
+                Multi-Language Swapping
+              </span>
+              <h2 className="text-xl md:text-2xl font-black text-white mt-1 max-w-lg leading-tight tracking-wide drop-shadow-md">
+                {switchingMessage}
+              </h2>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Custom Toast Alert */}
+      {toastMessage && (
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 text-white text-xs md:text-sm font-bold px-6 py-3 rounded-full border border-red-500/20 backdrop-blur-xl shadow-2xl z-[99999] animate-bounce flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-4 h-4 text-white">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+          </svg>
+          {toastMessage}
+        </div>
+      )}
+
+      {/* 6. Custom OTT-style Language Selector Bar */}
+      {!languageSelected && (
+        <div
+          className={`absolute bottom-0 left-0 w-full px-6 py-8 bg-gradient-to-t from-black/95 via-black/80 to-transparent z-40 transition-all duration-500 ease-out flex flex-col gap-4 ${
+            showControls ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8 pointer-events-none"
+          }`}
+        >
+          <div className="flex flex-col items-center w-full max-w-4xl mx-auto">
+            {/* Header Label */}
+            <div className="flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider text-zinc-400 select-none">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-4 h-4 text-yellow-400">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m10.5 21 5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138A14.37 14.37 0 0 0 9 5.25M17.25 21a3.75 3.75 0 0 1-3.75-3.75H18c0 2.072-1.678 3.75-3.75 3.75Zm0 0c1.12 0 2.233-.038 3.334-.114" />
+              </svg>
+              <span>Audio Language</span>
+            </div>
+
+            {/* Scrolling Pills */}
+            <div 
+              ref={langScrollRef}
+              onWheel={handleLangScrollWheel}
+              onMouseDown={handleMouseDown}
+              onMouseUp={handleMouseLeaveOrUp}
+              onMouseLeave={handleMouseLeaveOrUp}
+              onMouseMove={handleMouseMoveDrag}
+              className="w-full flex items-center justify-start gap-3 overflow-x-auto py-2.5 px-4 scrollbar-none snap-x snap-mandatory scroll-smooth bg-zinc-950/40 border border-white/5 rounded-full backdrop-blur-2xl shadow-inner cursor-grab active:cursor-grabbing select-none"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {ALL_LANGUAGES.map((lang) => {
+                const isSelected = selectedAudio === lang.code;
+                const isSupported = isLanguageSupported(lang.code);
+                
+                return (
+                  <button
+                    key={lang.code}
+                    disabled={!isSupported}
+                    onClick={() => handleLanguageSelect(lang.code)}
+                    className={`snap-center shrink-0 rounded-full px-5 py-2 text-xs font-bold transition-all duration-300 border focus:outline-none focus:ring-1 focus:ring-yellow-400 select-none ${
+                      isSelected
+                        ? "bg-yellow-400 text-black border-yellow-400 shadow-lg shadow-yellow-400/20 scale-105"
+                        : isSupported
+                          ? "bg-white/5 border-white/10 text-white hover:bg-white/15 hover:border-white/20 hover:scale-102 cursor-pointer"
+                          : "bg-white/2 border-white/2 text-zinc-600 border-dashed opacity-50 cursor-not-allowed"
+                    }`}
+                  >
+                    {lang.name} {isSelected && <span className="ml-1.5 text-[9px] uppercase font-black tracking-wider">Active</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

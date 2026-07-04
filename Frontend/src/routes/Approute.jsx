@@ -12,6 +12,7 @@ const AnimePage = React.lazy(() => import('../pages/AnimePage'));
 const DetailsPage = React.lazy(() => import('../pages/DetailsPage'));
 const PersonPage = React.lazy(() => import('../pages/PersonPage'));
 const WebSeries = React.lazy(() => import('../pages/WebSeries'));
+const ExplorePage = React.lazy(() => import('../pages/ExplorePage'));
 
 const LoginPage = React.lazy(() => import('../pages/LoginPage'));
 const SignupPage = React.lazy(() => import('../pages/SignupPage'));
@@ -35,6 +36,7 @@ const Approute = () => {
   return (
     <Suspense fallback={<Loader />}>
       <Routes>
+        <Route path='/explore' element={<ExplorePage />} />
         <Route path='/' element={<Home />} />
         <Route path='/cartoon' element={<CartoonPage />} />
         <Route path='/tv' element={<TVPage />} />

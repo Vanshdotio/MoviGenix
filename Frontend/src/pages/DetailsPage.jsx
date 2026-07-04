@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef, Suspense } from "react";
+import React, { useEffect, useState, useRef, Suspense } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { getMediaDetails, getTVSeasonDetails } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -32,7 +32,7 @@ const DetailsPage = ({ type: propType }) => {
   const type = propType || paramType;
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading: authLoading, toggleFavorite, toggleWatchlist, toggleNotifyMe, isNotifiedFor, addContinueWatching, getWatchlist, getContinueWatching } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, toggleFavorite, toggleWatchlist, toggleNotifyMe, isNotifiedFor, addContinueWatching, getWatchlist, getContinueWatching } = useAuth();
   
   const [media, setMedia] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -70,7 +70,7 @@ const DetailsPage = ({ type: propType }) => {
       } catch (err) {
         console.error("Error fetching media details:", err);
         if (err.response && err.response.status === 403) {
-          if (!user) {
+          if (!isAuthenticated) {
             const currentPath = location.pathname + location.search;
             navigate(`/login?redirect=${encodeURIComponent(currentPath)}`);
           } else {
@@ -86,7 +86,7 @@ const DetailsPage = ({ type: propType }) => {
 
     fetchDetails();
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [apiType, id, authLoading, user, location.pathname, location.search, navigate]);
+  }, [apiType, id, authLoading, isAuthenticated, location.pathname, location.search, navigate]);
 
   // Autoplay trigger
   useEffect(() => {
@@ -131,7 +131,8 @@ const DetailsPage = ({ type: propType }) => {
     (item) => String(item.id) === String(id) || String(item.showId) === String(id) || String(item.animeId) === String(id)
   );
 
-  const handleFavoriteClick = () => {
+  const handleFavoriteClick = (e) => {
+    if (e) e.preventDefault();
     if (!user) {
       navigate("/login");
       return;
@@ -148,7 +149,8 @@ const DetailsPage = ({ type: propType }) => {
     });
   };
 
-  const handleWatchlistClick = () => {
+  const handleWatchlistClick = (e) => {
+    if (e) e.preventDefault();
     if (!user) {
       navigate("/login");
       return;
@@ -525,7 +527,7 @@ const DetailsPage = ({ type: propType }) => {
               {releaseDate && <span>{releaseDate.slice(0, 4)}</span>}
               {isMovie && runtime && (
                 <>
-                  <span>â€¢</span>
+                  <span>{"\u2022"}</span>
                   <span>{formatRuntime(runtime)}</span>
                 </>
               )}
@@ -596,7 +598,7 @@ const DetailsPage = ({ type: propType }) => {
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
                         <path d="M20 17H22V19H2V17H4V10C4 5.58172 7.58172 2 12 2C16.4183 2 20 5.58172 20 10V17ZM18 17V10C18 6.68629 15.3137 4 12 4C8.68629 4 6 6.68629 6 10V17H18ZM9 21H15V23H9V21Z" />
                       </svg>
-                      {isNotified ? "Notified âœ“" : "Notify Me"}
+                      {isNotified ? "Notified \u2713" : "Notify Me"}
                     </button>
 
                     {/* Watchlist button */}
@@ -1063,7 +1065,7 @@ const DetailsPage = ({ type: propType }) => {
                               {season.name}
                             </h3>
                             <p className="text-xs text-yellow-400 font-medium mt-0.5">
-                              {season.episode_count} Episodes â€¢{" "}
+                              {season.episode_count} Episodes {"\u2022"}{" "}
                               {season.air_date ? season.air_date.slice(0, 4) : "TBA"}
                             </p>
                           </div>
@@ -1163,7 +1165,7 @@ const DetailsPage = ({ type: propType }) => {
                                         )}
                                         {episode.runtime && (
                                           <>
-                                            <span className="text-gray-700">â€¢</span>
+                                            <span className="text-gray-700">{"\u2022"}</span>
                                             <span>{episode.runtime}m</span>
                                           </>
                                         )}

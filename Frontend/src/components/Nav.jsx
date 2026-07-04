@@ -42,6 +42,7 @@ const Nav = () => {
 
   // Build menu items for mobile Staggered Menu
   const menuItems = [
+    { label: "Explore", link: "/explore" },
     { label: "Home", link: "/" },
     { label: "Web Series", link: "/web-series" },
     { label: "TV Shows", link: "/tv" },
@@ -104,24 +105,38 @@ const Nav = () => {
           />
         </Link>
         
-        <div className="flex items-center gap-4 sm:gap-6 md:gap-8 text-sm md:text-base select-none">
-          {/* Desktop Navigation Links */}
-          <div className="hidden lg:flex items-center gap-6 md:gap-8">
-            <Link to="/" className="hover:text-yellow-400 transition-colors duration-200">Home</Link>
-            <Link to="/web-series" className="hover:text-yellow-400 transition-colors duration-200">Web Series</Link>
-            <Link to="/tv" className="hover:text-yellow-400 transition-colors duration-200">TV Shows</Link>
-            <Link to="/cartoon" className="hover:text-yellow-400 transition-colors duration-200">Cartoon</Link>
-            {showAnime && <Link to="/anime" className="hover:text-yellow-400 transition-colors duration-200">Anime</Link>}
-            {user && user.role === "admin" && (
-              <Link to="/admin" className="text-yellow-400 hover:text-white font-bold transition-colors duration-200 flex items-center gap-1">
-                <i className="ri-shield-user-line text-sm"></i>
-                <span>Dashboard</span>
-              </Link>
-            )}
-          </div>
+        {/* Centered Navigation and Search (Desktop Only) */}
+        <div className="hidden lg:flex items-center justify-center gap-6 md:gap-8 absolute left-1/2 -translate-x-1/2 select-none">
+          <Link to="/explore" className="hover:text-yellow-400 transition-colors duration-200">Explore</Link>
+          <Link to="/" className="hover:text-yellow-400 transition-colors duration-200">Movies</Link>
+          <Link to="/web-series" className="hover:text-yellow-400 transition-colors duration-200">Web Series</Link>
+          <Link to="/tv" className="hover:text-yellow-400 transition-colors duration-200">TV Shows</Link>
+          <Link to="/cartoon" className="hover:text-yellow-400 transition-colors duration-200">Cartoons</Link>
+          {showAnime && <Link to="/anime" className="hover:text-yellow-400 transition-colors duration-200">Anime</Link>}
+          {user && user.role === "admin" && (
+            <Link to="/admin" className="text-yellow-400 hover:text-white font-bold transition-colors duration-200 flex items-center gap-1">
+              <i className="ri-shield-user-line text-sm"></i>
+              <span>Dashboard</span>
+            </Link>
+          )}
           
-          {/* Search Icon */}
-          <Link to="/search" aria-label="Search Movies and Shows" className="hover:text-yellow-400 transition-colors duration-200 flex items-center">
+          {/* Search Icon (Desktop) */}
+          <Link to="/search" aria-label="Search Movies and Shows" className="hover:text-yellow-400 transition-colors duration-200 flex items-center ml-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="search h-5 w-5 md:h-6 md:w-6 cursor-pointer"
+            >
+              <path d="M18.031 16.6168L22.3137 20.8995L20.8995 22.3137L16.6168 18.031C15.0769 19.263 13.124 20 11 20C6.032 20 2 15.968 2 11C2 6.032 6.032 2 11 2C15.968 2 20 6.032 20 11C20 13.124 19.263 15.0769 18.031 16.6168ZM16.0247 15.8748C17.2475 14.6146 18 12.8956 18 11C18 7.1325 14.8675 4 11 4C7.1325 4 4 7.1325 4 11C4 14.8675 7.1325 18 11 18C12.8956 18 14.6146 17.2475 15.8748 16.0247L16.0247 15.8748Z"></path>
+            </svg>
+          </Link>
+        </div>
+
+        {/* Right Actions Container */}
+        <div className="flex items-center gap-4 sm:gap-6 md:gap-8 text-sm md:text-base select-none ml-auto">
+          {/* Search Icon (Mobile Only - visible under lg breakpoint) */}
+          <Link to="/search" aria-label="Search Movies and Shows" className="lg:hidden hover:text-yellow-400 transition-colors duration-200 flex items-center">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"

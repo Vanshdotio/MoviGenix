@@ -1,4 +1,5 @@
  # Dependencies
+   Backend/node_modules/
     node_modules/
     */node_modules/
 
@@ -8,6 +9,7 @@
     *.env
 
     # Google OAuth secrets
+    Backend/client_secret*.json
     client_secret_*.json
 
     # Logs
@@ -37,3 +39,9 @@
 
     # Local config
     *.local
+
+   markdown/
+   screenscapedocs.md
+   vidcoredocs.md
+   vidfastdocs.md
+   vidsuperdocs.md

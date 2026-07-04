@@ -1803,10 +1803,58 @@ const getAnimeCollection = async (req, res) => {
   }
 };
 
+const PLAYER_PRIORITY = ["ScreenScape", "VidKing", "VidCore", "VidFast", "VidSuper"];
+
+const PLAYER_LANGUAGES = {
+  ScreenScape: ["hi", "te", "ta", "ml"],      // Regional/Indian languages
+  VidKing: ["en", "hi", "te", "ta", "ml", "kn", "pa", "fr", "es", "de", "ja", "ko", "zh"], // Main multi-language server
+  VidCore: ["en", "fr", "es", "de"],         // Western languages
+  VidFast: ["ja", "ko", "zh"],               // Asian languages
+  VidSuper: ["en", "hi", "te", "ta", "ml", "kn", "pa"] // Multi-lingual super-set
+};
+
+// Map ISO-639-1 code to ScreenScape format
+const getScreenScapeLang = (iso) => {
+  const mapping = {
+    en: "eng",
+    hi: "hin",
+    te: "tel",
+    ta: "tam",
+    ml: "mal",
+    kn: "kan",
+    ja: "japanese",
+    ko: "korean",
+    fr: "french",
+    es: "spanish"
+  };
+  return mapping[iso] || iso;
+};
+
+const selectPlayerForLanguage = (selectedLang, excludeList = []) => {
+  const lang = selectedLang ? selectedLang.toLowerCase() : "en";
+  
+  // First, find a player supporting the requested language that is not excluded
+  for (const player of PLAYER_PRIORITY) {
+    if (excludeList.includes(player)) continue;
+    const supported = PLAYER_LANGUAGES[player];
+    if (supported && supported.includes(lang)) {
+      return player;
+    }
+  }
+  
+  // Fallback: Return the highest priority player that is not excluded (even if language differs)
+  for (const player of PLAYER_PRIORITY) {
+    if (excludeList.includes(player)) continue;
+    return player;
+  }
+  
+  return null;
+};
+
 const getSecureMoviePlayerUrl = async (req, res) => {
   try {
     const { id } = req.params;
-    const { color, progress, audio, autoplay, server } = req.query;
+    const { audio = "en", progress = 0, exclude = "" } = req.query;
 
     if (!id) {
       return res.status(400).json({ error: "Movie ID is required" });
@@ -1817,23 +1865,43 @@ const getSecureMoviePlayerUrl = async (req, res) => {
       return res.status(403).json({ error: "Access denied. This content is age restricted.", isAdultContent: true });
     }
 
-    let playerUrl;
-    if (server === "vidsrc") {
-      playerUrl = `https://vidsrc.to/embed/movie/${id}`;
-    } else if (server === "vidlink") {
-      playerUrl = `https://vidlink.pro/embed/movie/${id}`;
-    } else {
-      const baseUrl = process.env.VIDKING_BASE_URL || "https://www.vidking.net";
-      const queryParams = new URLSearchParams();
-      if (color) queryParams.append("color", color);
-      if (progress) queryParams.append("progress", progress);
-      if (audio && audio !== "original") queryParams.append("audio", audio);
-      if (autoplay) queryParams.append("autoplay", autoplay);
-      const queryString = queryParams.toString();
-      playerUrl = `${baseUrl}/embed/movie/${id}${queryString ? `?${queryString}` : ""}`;
+    // Smart Player Selection
+    const excludeList = exclude ? exclude.split(",") : [];
+    const player = selectPlayerForLanguage(audio, excludeList);
+    if (!player) {
+      return res.json({ error: "No playback sources found for this content" });
     }
 
-    res.json({ playerUrl });
+    let embedUrl;
+    if (player === "ScreenScape") {
+      const baseUrl = process.env.PLAYER_SCREENSCAPE || "https://nxsha.screenscape.me/embed";
+      const lanVal = getScreenScapeLang(audio);
+      embedUrl = `${baseUrl}?tmdb=${id}&type=movie&lan=${lanVal}`;
+    } else if (player === "VidKing") {
+      const baseUrl = process.env.VIDKING_BASE_URL || "https://www.vidking.net";
+      embedUrl = `${baseUrl}/embed/movie/${id}?autoplay=true`;
+      if (progress && parseInt(progress) > 0) embedUrl += `&progress=${progress}`;
+      if (audio && audio !== "original") embedUrl += `&audio=${audio}`;
+    } else if (player === "VidCore") {
+      const baseUrl = process.env.PLAYER_VIDCORE || "https://vidcore.net";
+      embedUrl = `${baseUrl}/movie/${id}?autoPlay=true`;
+      if (progress && parseInt(progress) > 0) embedUrl += `&startAt=${progress}`;
+    } else if (player === "VidFast") {
+      const baseUrl = process.env.PLAYER_VIDFAST || "https://vidfast.pro";
+      embedUrl = `${baseUrl}/movie/${id}?autoPlay=true`;
+      if (progress && parseInt(progress) > 0) embedUrl += `&startAt=${progress}`;
+    } else if (player === "VidSuper") {
+      const baseUrl = process.env.PLAYER_VIDSUPER || "https://vidsuper.net";
+      embedUrl = `${baseUrl}/movie/${id}?autoplay=true`;
+      if (progress && parseInt(progress) > 0) embedUrl += `&progress=${progress}`;
+    }
+
+    res.json({
+      player,
+      embedUrl,
+      language: audio,
+      playerUrl: embedUrl // Backward compatibility
+    });
   } catch (error) {
     console.error("Error in getSecureMoviePlayerUrl:", error.message);
     res.status(500).json({ error: "Failed to generate movie player URL" });
@@ -1843,7 +1911,7 @@ const getSecureMoviePlayerUrl = async (req, res) => {
 const getSecureTVPlayerUrl = async (req, res) => {
   try {
     const { id, season, episode } = req.params;
-    const { color, progress, nextEpisode, episodeSelector, audio, autoplay, server } = req.query;
+    const { audio = "en", progress = 0, exclude = "" } = req.query;
 
     if (!id || !season || !episode) {
       return res.status(400).json({ error: "Show ID, season, and episode are required" });
@@ -1854,25 +1922,43 @@ const getSecureTVPlayerUrl = async (req, res) => {
       return res.status(403).json({ error: "Access denied. This content is age restricted.", isAdultContent: true });
     }
 
-    let playerUrl;
-    if (server === "vidsrc") {
-      playerUrl = `https://vidsrc.to/embed/tv/${id}/${season}/${episode}`;
-    } else if (server === "vidlink") {
-      playerUrl = `https://vidlink.pro/embed/tv/${id}/${season}/${episode}`;
-    } else {
-      const baseUrl = process.env.VIDKING_BASE_URL || "https://www.vidking.net";
-      const queryParams = new URLSearchParams();
-      if (color) queryParams.append("color", color);
-      if (progress) queryParams.append("progress", progress);
-      if (nextEpisode) queryParams.append("nextEpisode", nextEpisode);
-      if (episodeSelector) queryParams.append("episodeSelector", episodeSelector);
-      if (audio && audio !== "original") queryParams.append("audio", audio);
-      if (autoplay) queryParams.append("autoplay", autoplay);
-      const queryString = queryParams.toString();
-      playerUrl = `${baseUrl}/embed/tv/${id}/${season}/${episode}${queryString ? `?${queryString}` : ""}`;
+    // Smart Player Selection
+    const excludeList = exclude ? exclude.split(",") : [];
+    const player = selectPlayerForLanguage(audio, excludeList);
+    if (!player) {
+      return res.json({ error: "No playback sources found for this content" });
     }
 
-    res.json({ playerUrl });
+    let embedUrl;
+    if (player === "ScreenScape") {
+      const baseUrl = process.env.PLAYER_SCREENSCAPE || "https://nxsha.screenscape.me/embed";
+      const lanVal = getScreenScapeLang(audio);
+      embedUrl = `${baseUrl}?tmdb=${id}&type=tv&s=${season}&e=${episode}&lan=${lanVal}`;
+    } else if (player === "VidKing") {
+      const baseUrl = process.env.VIDKING_BASE_URL || "https://www.vidking.net";
+      embedUrl = `${baseUrl}/embed/tv/${id}/${season}/${episode}?autoplay=true`;
+      if (progress && parseInt(progress) > 0) embedUrl += `&progress=${progress}`;
+      if (audio && audio !== "original") embedUrl += `&audio=${audio}`;
+    } else if (player === "VidCore") {
+      const baseUrl = process.env.PLAYER_VIDCORE || "https://vidcore.net";
+      embedUrl = `${baseUrl}/tv/${id}/${season}/${episode}?autoPlay=true`;
+      if (progress && parseInt(progress) > 0) embedUrl += `&startAt=${progress}`;
+    } else if (player === "VidFast") {
+      const baseUrl = process.env.PLAYER_VIDFAST || "https://vidfast.pro";
+      embedUrl = `${baseUrl}/tv/${id}/${season}/${episode}?autoPlay=true`;
+      if (progress && parseInt(progress) > 0) embedUrl += `&startAt=${progress}`;
+    } else if (player === "VidSuper") {
+      const baseUrl = process.env.PLAYER_VIDSUPER || "https://vidsuper.net";
+      embedUrl = `${baseUrl}/tv/${id}/${season}/${episode}?autoplay=true`;
+      if (progress && parseInt(progress) > 0) embedUrl += `&progress=${progress}`;
+    }
+
+    res.json({
+      player,
+      embedUrl,
+      language: audio,
+      playerUrl: embedUrl // Backward compatibility
+    });
   } catch (error) {
     console.error("Error in getSecureTVPlayerUrl:", error.message);
     res.status(500).json({ error: "Failed to generate TV player URL" });

@@ -441,9 +441,8 @@ const filterUserMediaLists = async (user) => {
   return userObj;
 };
 
-// Initialize Google OAuth client with the client ID from the configuration
-const GOOGLE_CLIENT_ID =
-  "966319354665-nqevmcplc0tr3qd886183gf98trjdcuu.apps.googleusercontent.com";
+// Initialize Google OAuth client with the client ID from environment variables
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const generateToken = (userId) => {
