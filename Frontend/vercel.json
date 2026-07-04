@@ -1,6 +1,5 @@
 {
   "rewrites": [
-    { "source": "/sitemap.xml", "destination": "https://movigenix-backend.vercel.app/sitemap.xml" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
