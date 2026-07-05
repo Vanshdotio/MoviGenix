@@ -270,20 +270,8 @@ const VideoPlayer = ({
   };
 
   const startPlaybackCheck = (playerName, audioLang, progress, serverName) => {
-    if (fallbackTimeoutRef.current) {
-      clearTimeout(fallbackTimeoutRef.current);
-    }
-    
-    fallbackTimeoutRef.current = setTimeout(() => {
-      console.warn(`[Fallback Loop] Player "${playerName}" failed to start within timeout. Attempting fallback...`);
-      showToast(`Stream issue on "${playerName}". Checking backup...`);
-      
-      setFailedPlayers((prev) => {
-        const updated = [...prev, playerName];
-        fetchPlayerUrl(audioLang, progress, serverName, updated);
-        return updated;
-      });
-    }, 10000);
+    // Disabled auto-switching on playback issues as requested by the user
+    return;
   };
 
   // Build and fetch secure player URL
