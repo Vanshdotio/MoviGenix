@@ -32,78 +32,94 @@ authClient.interceptors.request.use(attachToken);
 
 /**
  * ==========================================
+ * IN-MEMORY RESPONSE CACHE (5 MIN TTL)
+ * Reduces duplicate network calls & latency to 0ms on re-navigation
+ * ==========================================
+ */
+const apiCache = new Map();
+const DEFAULT_CACHE_TTL = 5 * 60 * 1000;
+
+export const clearApiCache = () => {
+  apiCache.clear();
+};
+
+export const cachedGet = async (url, config = {}, ttl = DEFAULT_CACHE_TTL) => {
+  const cacheKey = `${url}:${JSON.stringify(config.params || {})}`;
+  const now = Date.now();
+
+  if (apiCache.has(cacheKey)) {
+    const cached = apiCache.get(cacheKey);
+    if (now - cached.timestamp < ttl) {
+      return cached.data;
+    }
+    apiCache.delete(cacheKey);
+  }
+
+  const response = await apiClient.get(url, config);
+  apiCache.set(cacheKey, { timestamp: now, data: response.data });
+  return response.data;
+};
+
+/**
+ * ==========================================
  * MOVIE METHODS
  * ==========================================
  */
 
 export const getPopularMovies = async (page) => {
-  const response = await apiClient.get("/popular", { params: { page } });
-  return response.data;
+  return cachedGet("/popular", { params: { page } });
 };
 
 export const getNowPlayingMovies = async (page) => {
-  const response = await apiClient.get("/now-playing", { params: { page } });
-  return response.data;
+  return cachedGet("/now-playing", { params: { page } });
 };
 
 export const getUpcomingMovies = async (page) => {
-  const response = await apiClient.get("/upcoming", { params: { page } });
-  return response.data;
+  return cachedGet("/upcoming", { params: { page } });
 };
 
 export const getMovieTopRated = async (page) => {
-  const response = await apiClient.get("/movie/top-rated", { params: { page } });
-  return response.data;
+  return cachedGet("/movie/top-rated", { params: { page } });
 };
 
 export const getTrendingMovies = async (page) => {
-  const response = await apiClient.get("/trending", { params: { page } });
-  return response.data;
+  return cachedGet("/trending", { params: { page } });
 };
 
 export const getSwipeMovies = async () => {
-  const response = await apiClient.get("/swipe");
-  return response.data;
+  return cachedGet("/swipe");
 };
 
 export const getKoreanDramas = async (page) => {
-  const response = await apiClient.get("/k-dramas", { params: { page } });
-  return response.data;
+  return cachedGet("/k-dramas", { params: { page } });
 };
 
 export const getBollywoodMovies = async (page) => {
-  const response = await apiClient.get("/bollywood", { params: { page } });
-  return response.data;
+  return cachedGet("/bollywood", { params: { page } });
 };
 
 export const getTollywoodMovies = async (page) => {
-  const response = await apiClient.get("/tollywood", { params: { page } });
-  return response.data;
+  return cachedGet("/tollywood", { params: { page } });
 };
 
 export const getHiddenGems = async (type = "movie", page) => {
-  const response = await apiClient.get(`/hidden-gems`, { params: { type, page } });
-  return response.data;
+  return cachedGet("/hidden-gems", { params: { type, page } });
 };
 
 export const getEditorsPicks = async (type = "movie", page) => {
-  const response = await apiClient.get(`/editors-picks`, { params: { type, page } });
-  return response.data;
+  return cachedGet("/editors-picks", { params: { type, page } });
 };
 
 export const getAwardWinning = async (type = "movie", page) => {
-  const response = await apiClient.get(`/award-winning`, { params: { type, page } });
-  return response.data;
+  return cachedGet("/award-winning", { params: { type, page } });
 };
 
 export const getPersonalizedRecommendations = async (type = "movie", page) => {
-  const response = await apiClient.get(`/recommendations`, { params: { type, page } });
-  return response.data;
+  return cachedGet("/recommendations", { params: { type, page } });
 };
 
 export const getBecauseYouWatched = async (type = "movie", page) => {
-  const response = await apiClient.get(`/because-you-watched`, { params: { type, page } });
-  return response.data;
+  return cachedGet("/because-you-watched", { params: { type, page } });
 };
 
 /**
@@ -322,8 +338,7 @@ export const getPopularPersons = async () => {
  */
 
 export const getGenres = async (type) => {
-  const response = await apiClient.get(`/genres/${type}`);
-  return response.data;
+  return cachedGet(`/genres/${type}`);
 };
 
 /**
@@ -333,10 +348,9 @@ export const getGenres = async (type) => {
  */
 
 export const discoverMedia = async (type, genreId = "", page = 1, extraParams = {}) => {
-  const response = await apiClient.get(`/discover/${type}`, {
+  return cachedGet(`/discover/${type}`, {
     params: { genre: genreId, page, ...extraParams },
   });
-  return response.data;
 };
 
 /**
@@ -345,9 +359,10 @@ export const discoverMedia = async (type, genreId = "", page = 1, extraParams = 
  * ==========================================
  */
 
-export const searchMedia = async (type, query, page = 1) => {
+export const searchMedia = async (type, query, page = 1, options = {}) => {
   const response = await apiClient.get(`/search/${type}`, {
     params: { query, page },
+    ...options,
   });
   return response.data;
 };
@@ -361,8 +376,7 @@ export const searchMedia = async (type, query, page = 1) => {
 export const getMediaDetails = async (type, id) => {
   // If the type is anime or web series, we query tv details in TMDB
   const actualType = (type === "anime" || type === "web-series" || type === "webSeries") ? "tv" : type;
-  const response = await apiClient.get(`/detail/${actualType}/${id}`);
-  return response.data;
+  return cachedGet(`/detail/${actualType}/${id}`);
 };
 
 export const getSecurePlayerUrl = async (type, tmdbId, params = {}) => {
@@ -376,8 +390,7 @@ export const getSecurePlayerUrl = async (type, tmdbId, params = {}) => {
 };
 
 export const getAvailableLanguages = async (type, id) => {
-  const response = await apiClient.get(`/languages/${type}/${id}`);
-  return response.data;
+  return cachedGet(`/languages/${type}/${id}`);
 };
 
 export const updatePlaybackPreferences = async (preferences) => {
@@ -386,13 +399,11 @@ export const updatePlaybackPreferences = async (preferences) => {
 };
 
 export const getPersonDetails = async (id) => {
-  const response = await apiClient.get(`/detail/person/${id}`);
-  return response.data;
+  return cachedGet(`/detail/person/${id}`);
 };
 
 export const getTVSeasonDetails = async (id, seasonNumber) => {
-  const response = await apiClient.get(`/detail/tv/${id}/season/${seasonNumber}`);
-  return response.data;
+  return cachedGet(`/detail/tv/${id}/season/${seasonNumber}`);
 };
 
 /**
@@ -417,6 +428,7 @@ export const googleLoginUser = async (credential) => {
 };
 
 export const logoutUser = async () => {
+  clearApiCache();
   const response = await authClient.post("/logout");
   return response.data;
 };

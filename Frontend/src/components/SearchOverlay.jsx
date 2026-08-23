@@ -6,6 +6,8 @@ import { useAuth } from "../context/AuthContext";
 import { SEOHead, generateBreadcrumbJsonLd } from "../seo";
 
 
+const DEBOUNCE_MS = 400;
+
 const SearchOverlay = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -45,46 +47,74 @@ const SearchOverlay = () => {
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (searchType === "anime" && !showAnime) {
-        setResults([]);
-        return;
-      }
-      if (!text.trim()) {
-        setResults([]);
-        const qParams = new URLSearchParams(window.location.search);
-        if (qParams.get("q")) {
-          navigate("/search", { replace: true });
-        }
-        return;
-      }
+    const controller = new AbortController();
+    const trimmedText = text.trim();
 
-      setLoading(true);
+    // Don't fire a request for empty/whitespace-only input — clear results
+    if (!trimmedText) {
+      setResults([]);
+      setLoading(false);
+      const qParams = new URLSearchParams(window.location.search);
+      if (qParams.get("q")) {
+        navigate("/search", { replace: true });
+      }
+      return;
+    }
 
+    // Skip very short queries (fewer than 2 characters)
+    if (trimmedText.length < 2) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+
+    if (searchType === "anime" && !showAnime) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+
+    // Show loading indicator while request is debouncing / in flight
+    setLoading(true);
+
+    const timer = setTimeout(async () => {
       try {
-        const data = await searchMedia(searchType, text);
-        // data.results is returned by the paginated search endpoint
-        const searchResults = data.results || [];
-        setResults(searchResults);
-        trackSearch(text, searchResults.length);
+        const data = await searchMedia(searchType, trimmedText, 1, { signal: controller.signal });
+        
+        // Ignore stale response if request was aborted
+        if (!controller.signal.aborted) {
+          const searchResults = data.results || [];
+          setResults(searchResults);
+          trackSearch(trimmedText, searchResults.length);
 
-        const qParams = new URLSearchParams(window.location.search);
-        const currentQ = qParams.get("q") || "";
-        if (text !== currentQ) {
-          navigate(`/search?q=${encodeURIComponent(text)}`, { replace: true });
+          const qParams = new URLSearchParams(window.location.search);
+          const currentQ = qParams.get("q") || "";
+          if (trimmedText !== currentQ) {
+            navigate(`/search?q=${encodeURIComponent(trimmedText)}`, { replace: true });
+          }
         }
       } catch (err) {
-        console.error("Error searching media:", err);
-        setResults([]);
-        trackSearch(text, 0);
+        if (err.name === "CanceledError" || err.name === "AbortError" || controller.signal.aborted) {
+          return;
+        }
+        if (!controller.signal.aborted) {
+          console.error("Error searching media:", err);
+          setResults([]);
+          trackSearch(trimmedText, 0);
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
-    };
+    }, DEBOUNCE_MS);
 
-    const delay = setTimeout(fetchData, 400);
-    return () => clearTimeout(delay);
-  }, [text, searchType]);
+    // Teardown / Cleanup: clear debounce timer & abort in-flight API request
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [text, searchType, showAnime, navigate]);
 
   const Back = () => {
     window.history.back();
