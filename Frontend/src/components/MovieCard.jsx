@@ -66,6 +66,7 @@ const MovieCard = ({ movie, type = "movie" }) => {
   return (
     <Link
       to={`/${cardType}/${generateSlug(title, movie.id)}`}
+      aria-label={`View details for ${title}`}
       className="group block bg-[#111] rounded-xl overflow-hidden 
                  shadow-md md:hover:shadow-2xl md:hover:-translate-y-1.5 
                  transition-all duration-300 cursor-pointer"

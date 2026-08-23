@@ -95,13 +95,13 @@ const Nav = () => {
         ref={navRef}
         className="fixed top-0 font-[Inter] left-0 w-full text-white bg-transparent justify-between flex items-center px-6 pr-7 py-2 transition-all duration-300 z-50"
       >
-        <Link to="/">
+        <Link to="/" aria-label="MoviGenix Home">
           <img
             src="/assets/movigenix-m-logo.png"
-            alt="Logo"
-            width={50}
-            height={50}
-            className="h-10 md:h-13 cursor-pointer select-none"
+            alt="MoviGenix Logo"
+            width={160}
+            height={40}
+            className="h-10 md:h-13 w-auto cursor-pointer select-none"
           />
         </Link>
         

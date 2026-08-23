@@ -49,10 +49,12 @@ const MediaSlider = ({ title, items = [], type = "movie", viewMoreLink }) => {
         {viewMoreLink && (
           <Link
             to={viewMoreLink}
+            aria-label={`View more ${title} movies and shows`}
             className="text-yellow-400 hover:text-yellow-300 font-semibold text-xs md:text-sm flex items-center gap-1.5 transition-all duration-250 group cursor-pointer"
           >
-            View More
-            <span className="inline-block transition-transform duration-200 group-hover:translate-x-1">→</span>
+            <span>View More</span>
+            <span className="sr-only"> {title}</span>
+            <span className="inline-block transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true">→</span>
           </Link>
         )}
       </div>

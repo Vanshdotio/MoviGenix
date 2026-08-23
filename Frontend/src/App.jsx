@@ -59,7 +59,9 @@ const App = () => {
   return (
     <Suspense fallback={<Loader />}>
       {!isAdminRoute && <Nav />}
-      <Approute />
+      <main id="main-content" className="min-h-screen bg-black">
+        <Approute />
+      </main>
       <ProfileCompletionModal />
     </Suspense>
   );

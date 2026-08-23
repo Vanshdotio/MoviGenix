@@ -172,8 +172,8 @@ const Home = () => {
                 <img
                   src={`https://image.tmdb.org/t/p/w780${lastSessionItem.poster_path}`}
                   alt=""
-                  width={1200}
-                  height={200}
+                  width={780}
+                  height={1170}
                   loading="lazy"
                   className="w-full h-full object-cover filter blur-sm scale-110"
                 />

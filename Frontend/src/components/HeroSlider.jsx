@@ -82,7 +82,7 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
         modules={[Autoplay, Navigation, Pagination]}
         className="w-full h-full"
       >
-        {heroItems.map((item) => {
+        {heroItems.map((item, index) => {
           const title = item.title || item.name || "Untitled";
           const rating = item.vote_average ? item.vote_average.toFixed(1) : "N/A";
           const backdropUrl = item.backdrop_path
@@ -91,6 +91,7 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
           const upcoming = isUpcomingContent(item);
           const releaseDateStr = item.release_date || item.first_air_date;
           const notified = isNotifiedFor ? isNotifiedFor(String(item.id)) : false;
+          const isFirst = index === 0;
 
           return (
             <SwiperSlide key={item.id}>
@@ -100,10 +101,10 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                   className="absolute inset-0 w-full h-full object-cover"
                   src={backdropUrl}
                   alt={title}
-                  loading="eager"
-                  fetchPriority="high"
-                  width={1920}
-                  height={1080}
+                  loading={isFirst ? "eager" : "lazy"}
+                  fetchPriority={isFirst ? "high" : "low"}
+                  width={1280}
+                  height={720}
                 />
 
                 {/* Dark Vignette Overlay */}
@@ -218,6 +219,7 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                         </button>
                         <Link
                           to={`/${type}/${generateSlug(item.title || item.name, item.id)}`}
+                          aria-label={`More Info about ${title}`}
                           className="cursor-pointer flex items-center gap-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-white px-6 py-3 font-semibold rounded-xl transition duration-200 active:scale-95 shadow-lg font-[Inter]"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-5 h-5" strokeLinecap="round" strokeLinejoin="round">
@@ -233,6 +235,7 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                       <>
                         <Link
                           to={`/${type}/${generateSlug(item.title || item.name, item.id)}`}
+                          aria-label={`Watch ${title} now`}
                           className="cursor-pointer flex items-center gap-2 bg-[#ffc600] hover:bg-[#e0af00] text-black px-6 py-3 font-bold rounded-xl transition duration-200 active:scale-95 shadow-lg font-[Inter]"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -242,6 +245,7 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
                         </Link>
                         <Link
                           to={`/${type}/${generateSlug(item.title || item.name, item.id)}`}
+                          aria-label={`More Info about ${title}`}
                           className="cursor-pointer flex items-center gap-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-white px-6 py-3 font-semibold rounded-xl transition duration-200 active:scale-95 shadow-lg font-[Inter]"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-5 h-5" strokeLinecap="round" strokeLinejoin="round">
