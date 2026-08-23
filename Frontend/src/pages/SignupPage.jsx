@@ -53,18 +53,20 @@ const SignupPage = () => {
     setErrorMsg("");
     setErrors({});
 
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+
     const newErrors = {};
-    if (!name.trim()) {
+    if (!trimmedName) {
       newErrors.name = "Name is required.";
     }
 
-    if (!email.trim()) {
+    if (!trimmedEmail) {
       newErrors.email = "Email is required.";
     } else {
-      // Regex that checks for '@' and ending with '.com' (matches the request email(@and.com))
-      const emailRegex = /^[^\s@]+@[^\s@]+\.com$/i;
-      if (!emailRegex.test(email)) {
-        newErrors.email = "Please enter a valid email containing '@' and ending with '.com'.";
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/i;
+      if (!emailRegex.test(trimmedEmail)) {
+        newErrors.email = "Please enter a valid email address.";
       }
     }
 
@@ -99,7 +101,7 @@ const SignupPage = () => {
 
     try {
       setLoading(true);
-      await signup(name, email, password, confirmPassword, dob);
+      await signup(trimmedName, trimmedEmail, password, confirmPassword, dob);
       navigate(redirectUrl);
     } catch (err) {
       const errMsg = err.message || "Failed to create account.";
@@ -381,11 +383,13 @@ const SignupPage = () => {
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
               onError={() => setErrorMsg("Google Sign-Up failed. Please try again.")}
-              useOneTap
               theme="dark"
               shape="rectangular"
               size="large"
               width="360"
+              text="signup_with"
+              logo_alignment="left"
+              locale="en"
             />
           </div>
         </div>

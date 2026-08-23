@@ -20,8 +20,11 @@ app.use(compression());
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "http://localhost:4173",
+  "http://127.0.0.1:4173",
   "http://localhost:5174",
   "http://127.0.0.1:5174",
+  "https://movigenix.vercel.app/"
 ];
 
 // Add custom CORS origin from env (e.g. your main Vercel production URL)
@@ -36,6 +39,9 @@ app.use(cors({
     
     // Check exact match
     if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    // Allow any localhost/127.0.0.1 origin on any port during local development
+    if (origin.match(/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/)) return callback(null, true);
     
     // Allow any Vercel preview/production URL for your project
     if (origin.match(/^https:\/\/.*\.vercel\.app$/)) return callback(null, true);

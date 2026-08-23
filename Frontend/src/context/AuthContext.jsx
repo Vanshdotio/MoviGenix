@@ -65,6 +65,13 @@ export const AuthProvider = ({ children }) => {
 
   // Check user session on initial render
   const checkSession = async () => {
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -78,9 +85,10 @@ export const AuthProvider = ({ children }) => {
         } catch (_) {
           // ignore — user may not be logged in yet
         }
+      } else {
+        setUser(null);
       }
     } catch (err) {
-      console.log("No active user session found.");
       setUser(null);
     } finally {
       setLoading(false);

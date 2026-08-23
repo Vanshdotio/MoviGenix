@@ -277,7 +277,7 @@ export const StaggeredMenu = ({
               return arr.map((c, i) => <div key={i} className="sm-prelayer" style={{ background: c }} />);
             })()}
           </div>
-          <aside id="staggered-menu-panel" ref={panelRef} className="staggered-menu-panel" aria-hidden={!open} inert={!open ? "" : undefined}>
+          <aside id="staggered-menu-panel" ref={panelRef} className="staggered-menu-panel" aria-hidden={!open} inert={!open ? true : undefined}>
             <div className="sm-panel-inner">
               <ul className="sm-panel-list" role="list" data-numbering={displayItemNumbering || undefined}>
                 {items.filter(it => !it.isAccount).map((it, idx) => (

@@ -434,6 +434,8 @@ export const logoutUser = async () => {
 };
 
 export const getUserProfile = async () => {
+  const token = localStorage.getItem("authToken");
+  if (!token) return null;
   const response = await authClient.get("/profile");
   return response.data;
 };

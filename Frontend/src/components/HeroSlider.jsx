@@ -73,7 +73,7 @@ const HeroSlider = ({ items = [], type = "movie" }) => {
     <div className="relative w-full h-[100vh] md:h-[85vh] bg-black">
       {firstBackdrop && (
         <Helmet>
-          <link rel="preload" as="image" href={firstBackdrop} fetchpriority="high" />
+          <link rel="preload" as="image" href={firstBackdrop} fetchPriority="high" />
         </Helmet>
       )}
       <Swiper

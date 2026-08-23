@@ -52,13 +52,15 @@ const LoginPage = () => {
     setSuccessMsg("");
     setErrors({});
 
+    const trimmedEmail = email.trim();
+
     const newErrors = {};
-    if (!email.trim()) {
+    if (!trimmedEmail) {
       newErrors.email = "Email is required.";
     } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.com$/i;
-      if (!emailRegex.test(email)) {
-        newErrors.email = "Please enter a valid email containing '@' and ending with '.com'.";
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/i;
+      if (!emailRegex.test(trimmedEmail)) {
+        newErrors.email = "Please enter a valid email address.";
       }
     }
 
@@ -73,7 +75,7 @@ const LoginPage = () => {
 
     try {
       setLoading(true);
-      await login(email, password, rememberMe);
+      await login(trimmedEmail, password, rememberMe);
       navigate(redirectUrl);
     } catch (err) {
       const errMsg = err.message || "Invalid credentials.";
@@ -303,11 +305,13 @@ const LoginPage = () => {
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
               onError={() => setErrorMsg("Google Sign-In failed. Please try again.")}
-              useOneTap
               theme="dark"
               shape="rectangular"
               size="large"
               width="360"
+              text="signin_with"
+              logo_alignment="left"
+              locale="en"
             />
           </div>
         </div>

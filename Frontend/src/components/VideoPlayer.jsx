@@ -11,7 +11,7 @@ import {
 import AudioSelector from "./AudioSelector";
 import { trackPlayerEvent, trackWatchProgress } from "../services/telemetry";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
-const AUTO_HIDE_MS = 4000;
+const ONBOARDING_LANG_MS = 5000;
 import { useAuth } from "../context/AuthContext";
 
 // Web Audio API Audio Enhancer Class
@@ -221,16 +221,21 @@ const VideoPlayer = ({
   });
   const [showServerMenu, setShowServerMenu] = useState(false);
 
-  // OTT Custom Language Selector States & Refs
+  // OTT Custom Language Selector Onboarding States & Refs
   const [switchingLanguage, setSwitchingLanguage] = useState(false);
   const [switchingMessage, setSwitchingMessage] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [languageSelected, setLanguageSelected] = useState(false);
   const [failedPlayers, setFailedPlayers] = useState([]);
-  const [isLangMenuFading, setIsLangMenuFading] = useState(false);
+
+  // Independent onboarding language selector visibility states
+  const [showLanguageSelector, setShowLanguageSelector] = useState(true);
+  const [isLangSelectorFading, setIsLangSelectorFading] = useState(false);
 
   const langScrollRef = useRef(null);
-  const langAutoHideTimerRef = useRef(null);
+  const langOnboardingTimerRef = useRef(null);
+  const langFadeTimeoutRef = useRef(null);
+
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -249,37 +254,38 @@ const VideoPlayer = ({
   const activePlayerRef = useRef(null);
   const fallbackTimeoutRef = useRef(null);
 
-  // Clear existing auto-hide timer
-  const clearLangAutoHideTimer = useCallback(() => {
-    if (langAutoHideTimerRef.current) {
-      clearTimeout(langAutoHideTimerRef.current);
-      langAutoHideTimerRef.current = null;
+  // Clear existing onboarding timers
+  const clearLangOnboardingTimer = useCallback(() => {
+    if (langOnboardingTimerRef.current) {
+      clearTimeout(langOnboardingTimerRef.current);
+      langOnboardingTimerRef.current = null;
+    }
+    if (langFadeTimeoutRef.current) {
+      clearTimeout(langFadeTimeoutRef.current);
+      langFadeTimeoutRef.current = null;
     }
   }, []);
 
-  // Start auto-hide timer with smooth fade-out
-  const startLangAutoHideTimer = useCallback(() => {
-    clearLangAutoHideTimer();
-    langAutoHideTimerRef.current = setTimeout(() => {
-      setIsLangMenuFading(true);
-      setTimeout(() => {
-        setLanguageSelected(true);
-        setIsLangMenuFading(false);
-      }, 250);
-    }, AUTO_HIDE_MS);
-  }, [clearLangAutoHideTimer]);
+  // Start 5-second onboarding timer with smooth fade-out
+  const startLangOnboardingTimer = useCallback(() => {
+    clearLangOnboardingTimer();
+    langOnboardingTimerRef.current = setTimeout(() => {
+      setIsLangSelectorFading(true);
+      langFadeTimeoutRef.current = setTimeout(() => {
+        setShowLanguageSelector(false);
+        setIsLangSelectorFading(false);
+      }, 300);
+    }, ONBOARDING_LANG_MS);
+  }, [clearLangOnboardingTimer]);
 
-  // Auto-hide timer effect when language menu is shown/hidden
+  // Initial onboarding trigger when player session starts / media changes
   useEffect(() => {
-    if (!languageSelected) {
-      setIsLangMenuFading(false);
-      startLangAutoHideTimer();
-    } else {
-      clearLangAutoHideTimer();
-      setIsLangMenuFading(false);
-    }
-    return () => clearLangAutoHideTimer();
-  }, [languageSelected, startLangAutoHideTimer, clearLangAutoHideTimer]);
+    setShowLanguageSelector(true);
+    setIsLangSelectorFading(false);
+    startLangOnboardingTimer();
+
+    return () => clearLangOnboardingTimer();
+  }, [type, id, season, episode, startLangOnboardingTimer, clearLangOnboardingTimer]);
 
   // Close menus on outside click
   useEffect(() => {
@@ -387,16 +393,10 @@ const VideoPlayer = ({
   const handleLanguageSelect = async (langCode) => {
     if (langCode === selectedAudio) return;
     
-    // Clear auto-hide timer and close language menu immediately on selection
-    clearLangAutoHideTimer();
-    setIsLangMenuFading(false);
-
-    // Hide controls immediately on selection so it disappears
-    setShowControls(false);
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-    
+    // Clear onboarding timer and hide language selector immediately on selection
+    clearLangOnboardingTimer();
+    setIsLangSelectorFading(false);
+    setShowLanguageSelector(false);
     setLanguageSelected(true);
     
     try {
@@ -616,9 +616,9 @@ const VideoPlayer = ({
       if (fallbackTimeoutRef.current) {
         clearTimeout(fallbackTimeoutRef.current);
       }
-      clearLangAutoHideTimer();
+      clearLangOnboardingTimer();
     };
-  }, [clearLangAutoHideTimer]);
+  }, [clearLangOnboardingTimer]);
 
   // PostMessage Commands Sender Helper
   const sendIframeCommand = (event, key = null, val = null) => {
@@ -1465,24 +1465,12 @@ const VideoPlayer = ({
         </div>
       )}
 
-      {/* 6. Custom OTT-style Language Selector Bar */}
-      {!languageSelected && (
+      {/* 6. Custom OTT-style Onboarding Language Selector Bar */}
+      {showLanguageSelector && !languageSelected && (
         <div
-          onMouseEnter={clearLangAutoHideTimer}
-          onMouseLeave={() => {
-            if (!languageSelected && !isLangMenuFading) {
-              startLangAutoHideTimer();
-            }
-          }}
-          onFocus={clearLangAutoHideTimer}
-          onBlur={() => {
-            if (!languageSelected && !isLangMenuFading) {
-              startLangAutoHideTimer();
-            }
-          }}
           className={`absolute bottom-0 left-0 w-full px-6 py-8 bg-gradient-to-t from-black/95 via-black/80 to-transparent z-40 transition-all duration-300 ease-out flex flex-col gap-4 ${
-            showControls && !isLangMenuFading
-              ? "opacity-100 translate-y-0"
+            !isLangSelectorFading
+              ? "opacity-100 translate-y-0 pointer-events-auto"
               : "opacity-0 translate-y-8 pointer-events-none"
           }`}
         >
