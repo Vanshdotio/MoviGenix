@@ -58,6 +58,8 @@ const getLanguageName = (lang) => {
   );
 };
 
+const AUTO_HIDE_MS = 4000;
+
 const AudioSelector = ({
   availableLanguages = [],
   selectedAudio,
@@ -65,31 +67,72 @@ const AudioSelector = ({
   onAudioChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isFadingOut, setIsFadingOut] = useState(false);
   const dropdownRef = useRef(null);
+  const autoHideTimerRef = useRef(null);
+
+  // Clear existing auto-hide timer
+  const clearAutoHideTimer = useCallback(() => {
+    if (autoHideTimerRef.current) {
+      clearTimeout(autoHideTimerRef.current);
+      autoHideTimerRef.current = null;
+    }
+  }, []);
+
+  // Start auto-hide timer with smooth fade-out
+  const startAutoHideTimer = useCallback(() => {
+    clearAutoHideTimer();
+    autoHideTimerRef.current = setTimeout(() => {
+      setIsFadingOut(true);
+      setTimeout(() => {
+        setIsOpen(false);
+        setIsFadingOut(false);
+      }, 250);
+    }, AUTO_HIDE_MS);
+  }, [clearAutoHideTimer]);
+
+  // Close immediately without delay (for selection, outside click, escape key)
+  const handleCloseImmediately = useCallback(() => {
+    clearAutoHideTimer();
+    setIsFadingOut(false);
+    setIsOpen(false);
+  }, [clearAutoHideTimer]);
+
+  // Auto-hide timer trigger on open/close
+  useEffect(() => {
+    if (isOpen) {
+      setIsFadingOut(false);
+      startAutoHideTimer();
+    } else {
+      clearAutoHideTimer();
+      setIsFadingOut(false);
+    }
+    return () => clearAutoHideTimer();
+  }, [isOpen, startAutoHideTimer, clearAutoHideTimer]);
 
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setIsOpen(false);
+        handleCloseImmediately();
       }
     };
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
+  }, [isOpen, handleCloseImmediately]);
 
   // Close on escape key
   useEffect(() => {
     const handleEscape = (e) => {
-      if (e.key === "Escape") setIsOpen(false);
+      if (e.key === "Escape") handleCloseImmediately();
     };
     if (isOpen) {
       document.addEventListener("keydown", handleEscape);
     }
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [isOpen]);
+  }, [isOpen, handleCloseImmediately]);
 
   if (!availableLanguages || availableLanguages.length === 0) return null;
 
@@ -137,9 +180,19 @@ const AudioSelector = ({
       {/* Dropdown Panel */}
       {isOpen && (
         <div
-          className="absolute top-full mt-2 right-0 w-64 max-h-72 overflow-y-auto rounded-xl bg-zinc-950/95 border border-white/10 backdrop-blur-2xl shadow-2xl"
+          onMouseEnter={clearAutoHideTimer}
+          onMouseLeave={() => {
+            if (isOpen && !isFadingOut) startAutoHideTimer();
+          }}
+          onFocus={clearAutoHideTimer}
+          onBlur={() => {
+            if (isOpen && !isFadingOut) startAutoHideTimer();
+          }}
+          className={`absolute top-full mt-2 right-0 w-64 max-h-72 overflow-y-auto rounded-xl bg-zinc-950/95 border border-white/10 backdrop-blur-2xl shadow-2xl transition-all duration-250 ease-out ${
+            isFadingOut ? "opacity-0 -translate-y-2 scale-95 pointer-events-none" : "opacity-100 translate-y-0 scale-100"
+          }`}
           style={{
-            animation: "audioDropdownIn 150ms ease-out",
+            animation: isFadingOut ? "none" : "audioDropdownIn 150ms ease-out",
           }}
         >
           {/* Header */}
@@ -165,7 +218,7 @@ const AudioSelector = ({
             <button
               onClick={() => {
                 onAudioChange("original");
-                setIsOpen(false);
+                handleCloseImmediately();
               }}
               className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 transition-all duration-150 cursor-pointer hover:bg-white/5 ${
                 currentLangCode === "original"
@@ -214,7 +267,7 @@ const AudioSelector = ({
                     key={`${langCode}-${lang.iso_3166_1}`}
                     onClick={() => {
                       onAudioChange(langCode);
-                      setIsOpen(false);
+                      handleCloseImmediately();
                     }}
                     className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 transition-all duration-150 cursor-pointer hover:bg-white/5 ${
                       isSelected ? "bg-blue-500/10" : ""

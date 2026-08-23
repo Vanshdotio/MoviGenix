@@ -11,6 +11,7 @@ import {
 import AudioSelector from "./AudioSelector";
 import { trackPlayerEvent, trackWatchProgress } from "../services/telemetry";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+const AUTO_HIDE_MS = 4000;
 import { useAuth } from "../context/AuthContext";
 
 // Web Audio API Audio Enhancer Class
@@ -226,8 +227,10 @@ const VideoPlayer = ({
   const [toastMessage, setToastMessage] = useState("");
   const [languageSelected, setLanguageSelected] = useState(false);
   const [failedPlayers, setFailedPlayers] = useState([]);
+  const [isLangMenuFading, setIsLangMenuFading] = useState(false);
 
   const langScrollRef = useRef(null);
+  const langAutoHideTimerRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -245,6 +248,38 @@ const VideoPlayer = ({
   const syncSettingsTimeoutRef = useRef(null);
   const activePlayerRef = useRef(null);
   const fallbackTimeoutRef = useRef(null);
+
+  // Clear existing auto-hide timer
+  const clearLangAutoHideTimer = useCallback(() => {
+    if (langAutoHideTimerRef.current) {
+      clearTimeout(langAutoHideTimerRef.current);
+      langAutoHideTimerRef.current = null;
+    }
+  }, []);
+
+  // Start auto-hide timer with smooth fade-out
+  const startLangAutoHideTimer = useCallback(() => {
+    clearLangAutoHideTimer();
+    langAutoHideTimerRef.current = setTimeout(() => {
+      setIsLangMenuFading(true);
+      setTimeout(() => {
+        setLanguageSelected(true);
+        setIsLangMenuFading(false);
+      }, 250);
+    }, AUTO_HIDE_MS);
+  }, [clearLangAutoHideTimer]);
+
+  // Auto-hide timer effect when language menu is shown/hidden
+  useEffect(() => {
+    if (!languageSelected) {
+      setIsLangMenuFading(false);
+      startLangAutoHideTimer();
+    } else {
+      clearLangAutoHideTimer();
+      setIsLangMenuFading(false);
+    }
+    return () => clearLangAutoHideTimer();
+  }, [languageSelected, startLangAutoHideTimer, clearLangAutoHideTimer]);
 
   // Close menus on outside click
   useEffect(() => {
@@ -352,6 +387,10 @@ const VideoPlayer = ({
   const handleLanguageSelect = async (langCode) => {
     if (langCode === selectedAudio) return;
     
+    // Clear auto-hide timer and close language menu immediately on selection
+    clearLangAutoHideTimer();
+    setIsLangMenuFading(false);
+
     // Hide controls immediately on selection so it disappears
     setShowControls(false);
     if (controlsTimeoutRef.current) {
@@ -577,8 +616,9 @@ const VideoPlayer = ({
       if (fallbackTimeoutRef.current) {
         clearTimeout(fallbackTimeoutRef.current);
       }
+      clearLangAutoHideTimer();
     };
-  }, []);
+  }, [clearLangAutoHideTimer]);
 
   // PostMessage Commands Sender Helper
   const sendIframeCommand = (event, key = null, val = null) => {
@@ -1428,8 +1468,22 @@ const VideoPlayer = ({
       {/* 6. Custom OTT-style Language Selector Bar */}
       {!languageSelected && (
         <div
-          className={`absolute bottom-0 left-0 w-full px-6 py-8 bg-gradient-to-t from-black/95 via-black/80 to-transparent z-40 transition-all duration-500 ease-out flex flex-col gap-4 ${
-            showControls ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8 pointer-events-none"
+          onMouseEnter={clearLangAutoHideTimer}
+          onMouseLeave={() => {
+            if (!languageSelected && !isLangMenuFading) {
+              startLangAutoHideTimer();
+            }
+          }}
+          onFocus={clearLangAutoHideTimer}
+          onBlur={() => {
+            if (!languageSelected && !isLangMenuFading) {
+              startLangAutoHideTimer();
+            }
+          }}
+          className={`absolute bottom-0 left-0 w-full px-6 py-8 bg-gradient-to-t from-black/95 via-black/80 to-transparent z-40 transition-all duration-300 ease-out flex flex-col gap-4 ${
+            showControls && !isLangMenuFading
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 translate-y-8 pointer-events-none"
           }`}
         >
           <div className="flex flex-col items-center w-full max-w-4xl mx-auto">
